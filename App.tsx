@@ -5,6 +5,7 @@ import ServiceTracker from './components/ServiceTracker';
 import AddHoursModal from './components/AddHoursModal';
 import SettingsModal from './components/SettingsModal';
 import HistoryModal from './components/HistoryModal';
+import OfflineToast from './components/OfflineToast'; // Importar el nuevo componente
 import { ThemeColor, HistoryLog, Shape } from './types';
 
 const APP_STORAGE_KEY = 'garden-service-tracker';
@@ -50,6 +51,7 @@ const App: React.FC = () => {
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHistoryModalOpen, setHistoryModalOpen] = useState(false);
+  const [isOfflineReady, setIsOfflineReady] = useState(false);
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
@@ -57,6 +59,16 @@ const App: React.FC = () => {
         navigator.serviceWorker.register('/service-worker.js')
           .then(registration => {
             console.log('ServiceWorker registration successful with scope: ', registration.scope);
+            // Si la instalación fue exitosa, mostramos la notificación
+            if (registration.installing) {
+               registration.installing.onstatechange = () => {
+                 if (registration.installing?.state === 'installed') {
+                   setIsOfflineReady(true);
+                 }
+               };
+            } else if (registration.active) {
+                // Ya estaba activo, no es necesario mostrar el toast de nuevo
+            }
           })
           .catch(error => {
             console.log('ServiceWorker registration failed: ', error);
@@ -182,6 +194,8 @@ const App: React.FC = () => {
         history={history}
         currentDate={currentDate}
       />
+
+      <OfflineToast isVisible={isOfflineReady} onDismiss={() => setIsOfflineReady(false)} />
     </div>
   );
 };
