@@ -14,7 +14,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ title, themeColor, streak, onStreakClick, onMenuClick }) => {
   const theme = THEMES[themeColor] || THEMES.blue;
-  const useCustomFont = ['Garden', 'Actividad', 'Historial', 'Mi Jardín'].includes(title);
+  const useCustomFont = ['Garden', 'Actividad', 'Historial'].includes(title);
 
   return (
     <header className="fixed top-0 left-0 right-0 bg-gray-100/80 dark:bg-slate-900/80 backdrop-blur-lg z-30 border-b border-slate-200/80 dark:border-slate-700/80">

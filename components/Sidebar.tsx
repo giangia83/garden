@@ -4,7 +4,6 @@ import { ThemeColor } from '../types';
 import { THEMES } from '../constants';
 import { CreditCardIcon } from './icons/CreditCardIcon';
 import { BoltIcon } from './icons/BoltIcon';
-import { EyeSlashIcon } from './icons/EyeSlashIcon';
 import { HomeModernIcon } from './icons/HomeModernIcon';
 import { GardenIcon } from './icons/GardenIcon';
 import { ArrowDownTrayIcon } from './icons/ArrowDownTrayIcon';
@@ -16,8 +15,6 @@ interface SidebarProps {
   onClose: () => void;
   performanceMode: boolean;
   onSetPerformanceMode: (enabled: boolean) => void;
-  hideGarden: boolean;
-  onSetHideGarden: (hidden: boolean) => void;
   onShowWelcome: () => void;
   onExport: () => void;
   onImport: () => void;
@@ -33,8 +30,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   onClose,
   performanceMode,
   onSetPerformanceMode,
-  hideGarden,
-  onSetHideGarden,
   onShowWelcome,
   onExport,
   onImport,
@@ -90,16 +85,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                         </div>
                     </div>
                     <ToggleSwitch checked={performanceMode} onChange={onSetPerformanceMode} themeColor={themeColor}/>
-                </div>
-                <div className="p-3 flex items-center justify-between">
-                    <div className="flex items-center">
-                        <EyeSlashIcon className={`w-6 h-6 mr-3 ${theme.text}`} />
-                        <div>
-                            <p className="font-semibold text-slate-700 dark:text-slate-200">Ocultar Jardín</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">Quita la pestaña del jardín.</p>
-                        </div>
-                    </div>
-                    <ToggleSwitch checked={hideGarden} onChange={onSetHideGarden} themeColor={themeColor}/>
                 </div>
                 <div className="p-3">
                     <div className="flex items-center justify-between">

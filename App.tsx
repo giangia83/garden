@@ -4,7 +4,6 @@ import BottomNav from './components/BottomNav';
 import ServiceTracker from './components/ServiceTracker';
 import HistoryView from './components/HistoryView';
 import ActivityView from './components/ActivityView';
-import GardenView from './components/GardenView';
 import GreetingCard from './components/GreetingCard';
 import AddHoursModal from './components/AddHoursModal';
 import SettingsModal from './components/SettingsModal';
@@ -31,7 +30,7 @@ const SETTINGS_KEY = 'garden-settings';
 const PRIVACY_MODE_KEY = 'garden-privacy-mode';
 const REMINDER_LAST_SENT_KEY = 'garden-reminder-last-sent';
 
-type AppView = 'tracker' | 'activity' | 'history' | 'garden';
+type AppView = 'tracker' | 'activity' | 'history';
 
 const TUTORIALS: Record<AppView, TutorialStep[]> = {
   tracker: [
@@ -39,10 +38,6 @@ const TUTORIALS: Record<AppView, TutorialStep[]> = {
     { target: '#timer-section', title: 'Temporizador Integrado', content: 'Usa el temporizador para registrar tu servicio en tiempo real. ¡No perderás ni un minuto!', position: 'top' },
     { target: '#streak-indicator', title: 'Tu Racha Diaria', content: '¡Mantén la motivación! Toca aquí para ver los detalles de tu racha y configurar tu día de descanso.', position: 'bottom' },
     { target: '#add-hours-button', title: 'Añadir Horas y Actividad', content: 'Usa este botón para añadir rápidamente las horas de tus sesiones de predicación o para registrar una revisita o estudio.', position: 'top' },
-  ],
-  garden: [
-    { target: '#garden-path-container', title: 'Tu Jardín Crece Contigo', content: 'A medida que registras horas, este camino crecerá, mostrando tu progreso durante el mes.', position: 'right' },
-    { target: '#flower-0', title: 'Flores de Recompensa', content: 'Alcanza hitos de horas para desbloquear flores. ¡Tócalas para recibir un mensaje animador!', position: 'left' },
   ],
   activity: [
     { target: '#activity-tabs', title: 'Organiza tu Ministerio', content: 'Cambia entre estas pestañas para ver tus grupos, revisitas y estudios bíblicos.', position: 'bottom' },
@@ -61,8 +56,6 @@ const getViewFromHash = (hash: string): AppView => {
             return 'activity';
         case '#/history':
             return 'history';
-        case '#/garden':
-            return 'garden';
         case '#/':
         case '':
         default:
@@ -135,17 +128,16 @@ const getInitialState = (): AppState | null => {
 const getSettings = () => {
     try {
         const saved = localStorage.getItem(SETTINGS_KEY);
-        if (!saved) return { performanceMode: false, hideGarden: false, remindersEnabled: false, reminderTime: '10:00' };
+        if (!saved) return { performanceMode: false, remindersEnabled: false, reminderTime: '10:00' };
         const parsed = JSON.parse(saved);
         return {
             performanceMode: parsed.performanceMode ?? false,
-            hideGarden: parsed.hideGarden ?? false,
             remindersEnabled: parsed.remindersEnabled ?? false,
             reminderTime: parsed.reminderTime ?? '10:00',
         };
     } catch (e) {
         console.error("Failed to load settings", e);
-        return { performanceMode: false, hideGarden: false, remindersEnabled: false, reminderTime: '10:00' };
+        return { performanceMode: false, remindersEnabled: false, reminderTime: '10:00' };
     }
 }
 
@@ -213,7 +205,6 @@ const App: React.FC = () => {
   
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [performanceMode, setPerformanceMode] = useState(initialSettings.performanceMode);
-  const [hideGarden, setHideGarden] = useState(initialSettings.hideGarden);
   const [remindersEnabled, setRemindersEnabled] = useState(initialSettings.remindersEnabled);
   const [reminderTime, setReminderTime] = useState(initialSettings.reminderTime);
 
@@ -244,18 +235,14 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const settings = { performanceMode, hideGarden, remindersEnabled, reminderTime };
+    const settings = { performanceMode, remindersEnabled, reminderTime };
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-  }, [performanceMode, hideGarden, remindersEnabled, reminderTime]);
+  }, [performanceMode, remindersEnabled, reminderTime]);
   
   useEffect(() => {
     const handleHashChange = () => {
         const newView = getViewFromHash(window.location.hash);
-        if (newView === 'garden' && hideGarden) {
-          window.location.hash = '#/';
-        } else {
-          setActiveView(newView);
-        }
+        setActiveView(newView);
     };
 
     window.addEventListener('hashchange', handleHashChange);
@@ -264,7 +251,7 @@ const App: React.FC = () => {
     return () => {
         window.removeEventListener('hashchange', handleHashChange);
     };
-  }, [hideGarden]);
+  }, []);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -345,7 +332,7 @@ const App: React.FC = () => {
   };
   
   const handleSkipAllTutorials = () => {
-    const allSeen: TutorialsSeen = { tracker: true, garden: true, activity: true, history: true };
+    const allSeen: TutorialsSeen = { tracker: true, activity: true, history: true };
     setTutorialsSeen(allSeen);
     localStorage.setItem(TUTORIALS_SEEN_KEY, JSON.stringify(allSeen));
     localStorage.setItem(TUTORIAL_AGREEMENT_KEY, 'false');
@@ -796,7 +783,6 @@ const App: React.FC = () => {
     tracker: 'Garden',
     activity: 'Actividad',
     history: 'Historial',
-    garden: 'Mi Jardín',
   };
   const viewTitle = viewTitleMap[activeView];
 
@@ -825,14 +811,6 @@ const App: React.FC = () => {
             <GreetingCard userName={userName} themeColor={themeColor} performanceMode={performanceMode} />
           </>
         );
-      case 'garden':
-        return <GardenView 
-                  currentHours={currentHours}
-                  goal={goal}
-                  themeColor={themeColor}
-                  performanceMode={performanceMode}
-                  isPrivacyMode={isPrivacyMode}
-                />;
       case 'activity':
         return <ActivityView 
                   activities={activities}
@@ -887,8 +865,6 @@ const App: React.FC = () => {
         onClose={() => setSidebarOpen(false)}
         performanceMode={performanceMode}
         onSetPerformanceMode={setPerformanceMode}
-        hideGarden={hideGarden}
-        onSetHideGarden={setHideGarden}
         onShowWelcome={handleShowWelcome}
         onExport={handleExportData}
         onImport={handleImportClick}
@@ -910,7 +886,6 @@ const App: React.FC = () => {
         activeView={activeView}
         onAddClick={openAddModal} 
         themeColor={themeColor}
-        isGardenHidden={hideGarden}
         performanceMode={performanceMode}
       />
 

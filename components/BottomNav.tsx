@@ -8,13 +8,12 @@ import { GardenIcon } from './icons/GardenIcon';
 import { ThemeColor } from '../types';
 import { THEMES } from '../constants';
 
-type ActiveView = 'tracker' | 'activity' | 'history' | 'garden';
+type ActiveView = 'tracker' | 'activity' | 'history';
 
 interface BottomNavProps {
   activeView: ActiveView;
   onAddClick: () => void;
   themeColor: ThemeColor;
-  isGardenHidden?: boolean;
   performanceMode?: boolean;
 }
 
@@ -22,25 +21,21 @@ const BottomNav: React.FC<BottomNavProps> = ({
   activeView, 
   onAddClick,
   themeColor,
-  isGardenHidden = false,
   performanceMode = false,
 }) => {
   const theme = THEMES[themeColor] || THEMES.blue;
 
   const navItems = [
     { view: 'tracker', hash: '#/', Icon: HomeIcon, label: 'Informe' },
-    { view: 'garden', hash: '#/garden', Icon: GardenIcon, label: 'Jardín' },
     { view: 'add', hash: '', Icon: PlusIcon, label: 'Agregar' },
     { view: 'activity', hash: '#/activity', Icon: ListBulletIcon, label: 'Actividad' },
     { view: 'history', hash: '#/history', Icon: CalendarIcon, label: 'Historial' },
   ];
   
-  const visibleNavItems = navItems.filter(item => !(isGardenHidden && item.view === 'garden'));
-
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-gray-50/70 dark:bg-slate-900/70 backdrop-blur-lg border-t border-slate-200/60 dark:border-slate-700/60 z-10">
       <div className="flex items-center justify-around h-20 max-w-lg mx-auto">
-        {visibleNavItems.map(item => {
+        {navItems.map(item => {
           const isActive = activeView === item.view;
           const isAddButton = item.view === 'add';
           const showGlow = isActive && !isAddButton && !performanceMode;

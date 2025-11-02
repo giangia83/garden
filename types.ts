@@ -58,7 +58,7 @@ export type TutorialStep = {
 };
 
 export type TutorialsSeen = {
-  [key in 'tracker' | 'activity' | 'history' | 'garden']?: boolean;
+  [key in 'tracker' | 'activity' | 'history']?: boolean;
 };
 
 export type AppState = {

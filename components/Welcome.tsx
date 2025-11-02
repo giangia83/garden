@@ -75,12 +75,6 @@ const slideData: Slide[] = [
   },
   {
     type: 'feature',
-    icon: (theme: Theme) => <GardenIcon className={`w-16 h-16 ${theme.text}`} />,
-    title: "Cultiva tu jardín",
-    description: "A medida que cumples tus metas, verás crecer un hermoso jardín virtual. ¡Cada flor es un recordatorio de tu esfuerzo!",
-  },
-  {
-    type: 'feature',
     icon: (theme: Theme) => <ListBulletIcon className={`w-16 h-16 ${theme.text}`} />,
     title: "Organiza tu ministerio",
     description: "Anota tus revisitas y estudios. Además, puedes pegar los arreglos de grupo y la app los organizará por ti usando IA.",
@@ -266,7 +260,8 @@ const Welcome: React.FC<WelcomeProps> = ({
                   ) : slide.type === 'customize' ? (
                     <>
                       <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-2 tracking-tight">{slide.title}</h2>
-                      <p className="text-slate-600 dark:text-slate-400 max-w-sm leading-relaxed mb-4">{slide.description}</p>
+                      {/* FIX: Handle function type for slide description to resolve TypeScript error. */}
+                      <p className="text-slate-600 dark:text-slate-400 max-w-sm leading-relaxed mb-4">{typeof slide.description === 'function' ? slide.description(setupData.name) : slide.description}</p>
                       
                       <div className="w-full max-w-sm text-left space-y-3">
                           <div className="relative w-32 h-32 mx-auto mb-2">
@@ -336,7 +331,8 @@ const Welcome: React.FC<WelcomeProps> = ({
                   ) : slide.type === 'setup' ? (
                     <>
                       <h2 className="text-4xl font-bold text-white mb-2 tracking-tight">{slide.title}</h2>
-                      <p className="text-slate-200 max-w-sm leading-relaxed mb-4">{slide.description}</p>
+                      {/* FIX: Handle function type for slide description to resolve TypeScript error. */}
+                      <p className="text-slate-200 max-w-sm leading-relaxed mb-4">{typeof slide.description === 'function' ? slide.description(setupData.name) : slide.description}</p>
                       <div className="w-full max-w-sm text-left space-y-4 bg-white dark:bg-slate-800 p-4 rounded-xl shadow-inner h-full max-h-80 flex flex-col">
                           <div className="flex-shrink-0">
                               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tu nombre</label>
