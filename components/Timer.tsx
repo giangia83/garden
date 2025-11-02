@@ -1,120 +1,197 @@
-import React, { useState, useEffect } from 'react';
-import { PlayIcon } from './icons/PlayIcon';
-import { PauseIcon } from './icons/PauseIcon';
-import { CheckIcon } from './icons/CheckIcon';
-import { RefreshIcon } from './icons/RefreshIcon';
+import React, { useState, useEffect, useRef } from 'react';
 import { ThemeColor } from '../types';
 import { THEMES } from '../constants';
+import { hoursToHHMM } from '../utils';
+import { PlayIcon } from './icons/PlayIcon';
+import { PauseIcon } from './icons/PauseIcon';
+import { StopIcon } from './icons/StopIcon';
+import { RefreshIcon } from './icons/RefreshIcon';
+
+// FIX: Define NotificationAction type to resolve TypeScript error.
+// The built-in type might not be available in the current environment.
+interface NotificationAction {
+  action: string;
+  title: string;
+  icon?: string;
+}
 
 interface TimerProps {
   onFinish: (hours: number) => void;
   themeColor: ThemeColor;
+  notificationPermission: NotificationPermission;
+  onRequestNotificationPermission: () => Promise<void>;
+  performanceMode: boolean;
 }
 
 const TIMER_STORAGE = {
   START_TIME: 'timer_startTime',
   BASE_TIME: 'timer_baseTime',
-  IS_ACTIVE: 'timer_isActive',
 };
 
-const Timer: React.FC<TimerProps> = ({ onFinish, themeColor }) => {
+const NOTIFICATION_TAG = 'garden-timer';
+
+const Timer: React.FC<TimerProps> = ({ 
+  onFinish, 
+  themeColor, 
+  notificationPermission,
+  onRequestNotificationPermission,
+  performanceMode,
+}) => {
   const [time, setTime] = useState(0); // in seconds
   const [isActive, setIsActive] = useState(false);
+  const intervalRef = useRef<number | null>(null);
   const theme = THEMES[themeColor] || THEMES.blue;
 
+  useEffect(() => {
+    const startTime = localStorage.getItem(TIMER_STORAGE.START_TIME);
+    const baseTime = parseFloat(localStorage.getItem(TIMER_STORAGE.BASE_TIME) || '0');
+
+    if (startTime) {
+      const elapsed = (Date.now() - parseFloat(startTime)) / 1000;
+      setTime(baseTime + elapsed);
+      setIsActive(true);
+    } else {
+      setTime(baseTime);
+      setIsActive(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isActive) {
+      const startTime = parseFloat(localStorage.getItem(TIMER_STORAGE.START_TIME) || String(Date.now()));
+      const baseTime = parseFloat(localStorage.getItem(TIMER_STORAGE.BASE_TIME) || '0');
+
+      intervalRef.current = window.setInterval(() => {
+        const elapsed = (Date.now() - startTime) / 1000;
+        setTime(baseTime + elapsed);
+      }, 1000);
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [isActive]);
+
+  const showNotification = (body: string, requireInteraction = false, actions: NotificationAction[] = []) => {
+    if (notificationPermission !== 'granted') return;
+    navigator.serviceWorker.ready.then(registration => {
+      // FIX: Cast notification options to 'any' to allow the 'actions' property,
+      // which might not be present in the environment's NotificationOptions type definition.
+      registration.showNotification('Garden Service Tracker', {
+        body,
+        icon: '/assets/icon-192x192.svg',
+        tag: NOTIFICATION_TAG,
+        requireInteraction,
+        actions
+      } as any);
+    });
+  };
+
+  const handleToggle = async () => {
+    if (notificationPermission === 'default') {
+      await onRequestNotificationPermission();
+    }
+
+    setIsActive(prev => {
+      const newIsActive = !prev;
+      if (newIsActive) {
+        // Starting
+        localStorage.setItem(TIMER_STORAGE.START_TIME, String(Date.now()));
+        showNotification("El temporizador ha comenzado.", true, [
+          { action: 'pause', title: 'Pausar' },
+          { action: 'finish', title: 'Finalizar' }
+        ]);
+      } else {
+        // Pausing
+        const startTime = localStorage.getItem(TIMER_STORAGE.START_TIME);
+        const baseTime = parseFloat(localStorage.getItem(TIMER_STORAGE.BASE_TIME) || '0');
+        if (startTime) {
+          const elapsed = (Date.now() - parseFloat(startTime)) / 1000;
+          const newBaseTime = baseTime + elapsed;
+          localStorage.setItem(TIMER_STORAGE.BASE_TIME, String(newBaseTime));
+          localStorage.removeItem(TIMER_STORAGE.START_TIME);
+          setTime(newBaseTime);
+        }
+        showNotification("El temporizador está en pausa.");
+      }
+      return newIsActive;
+    });
+  };
+  
+  const handleFinish = () => {
+    setIsActive(false);
+    if (intervalRef.current) clearInterval(intervalRef.current);
+
+    const hoursToAdd = time / 3600;
+
+    if (hoursToAdd > 0.01) { // minimum of ~36 seconds
+      onFinish(hoursToAdd);
+      showNotification(`Se agregaron ${hoursToHHMM(hoursToAdd)} horas a tu informe.`);
+    }
+
+    // Reset
+    setTime(0);
+    localStorage.removeItem(TIMER_STORAGE.START_TIME);
+    localStorage.removeItem(TIMER_STORAGE.BASE_TIME);
+    navigator.serviceWorker.ready.then(registration => {
+        registration.getNotifications({ tag: NOTIFICATION_TAG }).then(notifications => {
+            notifications.forEach(notification => notification.close());
+        });
+    });
+  };
+
+  const handleReset = () => {
+    setIsActive(false);
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    setTime(0);
+    localStorage.removeItem(TIMER_STORAGE.START_TIME);
+    localStorage.removeItem(TIMER_STORAGE.BASE_TIME);
+    navigator.serviceWorker.ready.then(registration => {
+        registration.getNotifications({ tag: NOTIFICATION_TAG }).then(notifications => {
+            notifications.forEach(notification => notification.close());
+        });
+    });
+  };
+  
   const formatTime = (totalSeconds: number) => {
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = Math.floor(totalSeconds % 60);
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
   };
-  
-  // Load state from localStorage on mount
-  useEffect(() => {
-    try {
-      const savedIsActive = localStorage.getItem(TIMER_STORAGE.IS_ACTIVE) === 'true';
-      const savedBaseTime = parseFloat(localStorage.getItem(TIMER_STORAGE.BASE_TIME) || '0');
-      const savedStartTime = parseFloat(localStorage.getItem(TIMER_STORAGE.START_TIME) || '0');
-
-      if (savedIsActive && savedStartTime > 0) {
-        const elapsedSinceLastStart = (Date.now() - savedStartTime) / 1000;
-        setTime(savedBaseTime + elapsedSinceLastStart);
-        setIsActive(true);
-      } else {
-        setTime(savedBaseTime);
-        setIsActive(false);
-      }
-    } catch (e) {
-      console.error("Failed to load timer state", e);
-    }
-  }, []);
-
-  // Timer interval effect
-  useEffect(() => {
-    // The return type of `setInterval` in the browser is `number`.
-    let interval: number | undefined;
-    if (isActive) {
-      interval = window.setInterval(() => {
-        setTime(prevTime => prevTime + 1);
-      }, 1000);
-    }
-    return () => {
-      if (interval) window.clearInterval(interval);
-    };
-  }, [isActive]);
-
-  const handleStart = () => {
-    setIsActive(true);
-    localStorage.setItem(TIMER_STORAGE.IS_ACTIVE, 'true');
-    localStorage.setItem(TIMER_STORAGE.START_TIME, String(Date.now()));
-    // Base time is already set from pause or initial load
-  };
-
-  const handlePause = () => {
-    setIsActive(false);
-    localStorage.setItem(TIMER_STORAGE.IS_ACTIVE, 'false');
-    localStorage.setItem(TIMER_STORAGE.BASE_TIME, String(time));
-    localStorage.removeItem(TIMER_STORAGE.START_TIME);
-  };
-  
-  const handleReset = () => {
-    setIsActive(false);
-    setTime(0);
-    localStorage.removeItem(TIMER_STORAGE.IS_ACTIVE);
-    localStorage.removeItem(TIMER_STORAGE.BASE_TIME);
-    localStorage.removeItem(TIMER_STORAGE.START_TIME);
-  };
-
-  const handleFinish = () => {
-    handlePause(); // Ensure latest time is saved to base
-    const hoursToAdd = time / 3600;
-    if (hoursToAdd > 0) {
-      onFinish(hoursToAdd);
-    }
-    handleReset();
-  };
 
   return (
-    <div className="w-full text-center">
-      <h3 className="text-center text-sm font-semibold text-slate-500 mb-4">Temporizador de Servicio</h3>
-      <p className="text-5xl font-mono font-bold text-slate-800 tracking-tighter mb-4">
+    <div className="flex flex-col items-center w-full">
+      <p className="text-6xl font-mono font-bold text-slate-800 dark:text-slate-100 tracking-tighter mb-6">
         {formatTime(time)}
       </p>
-      <div className="flex justify-center items-center space-x-4">
-        <button onClick={handleReset} className="p-3 bg-slate-200 text-slate-600 rounded-full hover:bg-slate-300 transition-colors" aria-label="Reiniciar temporizador">
-          <RefreshIcon className="w-6 h-6" />
+      <div className="grid grid-cols-3 gap-4 w-full max-w-xs">
+        <button
+            onClick={handleReset}
+            className={`p-3 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-full flex items-center justify-center transition-transform ${!performanceMode && 'transform hover:scale-105'}`}
+            aria-label="Reiniciar temporizador"
+        >
+            <RefreshIcon className="w-6 h-6" />
         </button>
-        
-        <button 
-          onClick={isActive ? handlePause : handleStart}
-          className={`p-4 rounded-full bg-gradient-to-br ${theme.gradientFrom} ${theme.gradientTo} text-white shadow-lg w-20 h-20 flex items-center justify-center`}
+        <button
+          onClick={handleToggle}
+          className={`p-4 rounded-full flex items-center justify-center text-white shadow-lg transition-transform ${theme.bg} ${!performanceMode && 'transform hover:scale-105'}`}
           aria-label={isActive ? 'Pausar temporizador' : 'Iniciar temporizador'}
         >
           {isActive ? <PauseIcon className="w-8 h-8" /> : <PlayIcon className="w-8 h-8" />}
         </button>
-
-        <button onClick={handleFinish} className="p-3 bg-slate-200 text-slate-600 rounded-full hover:bg-slate-300 transition-colors" aria-label="Finalizar y guardar tiempo">
-          <CheckIcon className="w-7 h-7" />
+        <button
+            onClick={handleFinish}
+            className={`p-3 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-full flex items-center justify-center transition-transform ${!performanceMode && 'transform hover:scale-105'}`}
+            aria-label="Finalizar y agregar horas"
+        >
+            <StopIcon className="w-6 h-6" />
         </button>
       </div>
     </div>

@@ -1,23 +1,49 @@
 import React from 'react';
-import { FlowerIcon } from './icons/FlowerIcon';
+import { GardenIcon } from './icons/GardenIcon';
+import { ThemeColor } from '../types';
+import { THEMES } from '../constants';
+import { Bars3Icon } from './icons/Bars3Icon';
 
 interface HeaderProps {
-  userName: string;
+  title: string;
+  themeColor: ThemeColor;
+  streak: number;
+  onStreakClick: () => void;
+  onMenuClick: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ userName }) => {
+const Header: React.FC<HeaderProps> = ({ title, themeColor, streak, onStreakClick, onMenuClick }) => {
+  const theme = THEMES[themeColor] || THEMES.blue;
+  const useCustomFont = ['Garden', 'Actividad', 'Historial', 'Mi Jardín'].includes(title);
+
   return (
-    <header className="fixed top-0 left-0 right-0 bg-slate-50/80 backdrop-blur-lg z-10 border-b border-slate-200">
-      <div className="flex items-center justify-between h-20 px-4 md:px-6 lg:px-8">
-        <div className="flex items-center space-x-2">
-          <FlowerIcon className="h-8 w-8" />
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Garden
-          </h1>
+    <header className="fixed top-0 left-0 right-0 bg-gray-100/80 dark:bg-slate-900/80 backdrop-blur-lg z-30 border-b border-slate-200/80 dark:border-slate-700/80">
+      <div className="relative flex items-center justify-between h-20 px-4">
+        <div className="flex items-center -ml-2">
+          <button 
+            onClick={onMenuClick}
+            className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50 transition-colors z-20"
+            aria-label="Abrir menú"
+          >
+            <Bars3Icon className="w-8 h-8" />
+          </button>
         </div>
-        <div className="text-right">
-          <p className="text-sm font-medium text-slate-600">Hola, {userName}</p>
-        </div>
+        
+        <h1 className={`absolute left-1/2 -translate-x-1/2 text-3xl text-slate-900 dark:text-slate-100 ${useCustomFont ? 'font-logotype pb-1' : 'font-bold tracking-tight'}`}>
+          {title}
+        </h1>
+        
+        <button 
+          id="streak-indicator"
+          onClick={onStreakClick} 
+          className="flex items-center space-x-2 p-2 -mr-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700/50 transition-colors z-20"
+          aria-label="Ver detalles de la racha"
+        >
+          {streak > 0 && (
+            <span className={`text-2xl font-bold ${theme.text} animate-fadeIn`}>{streak}</span>
+          )}
+          <GardenIcon className={`w-8 h-8 ${theme.text}`} />
+        </button>
       </div>
     </header>
   );

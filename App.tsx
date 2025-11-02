@@ -1,29 +1,129 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import ServiceTracker from './components/ServiceTracker';
+import HistoryView from './components/HistoryView';
+import ActivityView from './components/ActivityView';
+import GardenView from './components/GardenView';
+import GreetingCard from './components/GreetingCard';
 import AddHoursModal from './components/AddHoursModal';
 import SettingsModal from './components/SettingsModal';
-import HistoryModal from './components/HistoryModal';
-import OfflineToast from './components/OfflineToast'; // Importar el nuevo componente
-import { ThemeColor, HistoryLog, Shape } from './types';
+import HelpModal from './components/HelpModal';
+import OfflineToast from './components/OfflineToast';
+import Welcome from './components/Welcome';
+import StreakRestoreToast from './components/StreakRestoreToast';
+import StreakModal from './components/StreakModal';
+import InteractiveTutorial from './components/InteractiveTutorial';
+import TutorialConfirmationModal from './components/TutorialConfirmationModal';
+import GoalReachedModal from './components/GoalReachedModal';
+import Sidebar from './components/Sidebar';
+import EndOfYearModal from './components/EndOfYearModal';
+import ConfirmationModal from './components/ConfirmationModal';
+import { useOnlineStatus } from './hooks/useOnlineStatus';
+import { ThemeColor, HistoryLog, Shape, ActivityItem, ActivityType, ThemeMode, GroupArrangement, SetupData, TutorialsSeen, TutorialStep, AppState, WeatherCondition, DayStatus, DayEntry } from './types';
+import { isSameDay, daysBetween, isWeekend, getServiceYear, getServiceYearMonths } from './utils';
 
-const APP_STORAGE_KEY = 'garden-service-tracker';
+const APP_STORAGE_key = 'garden-service-tracker';
+const WELCOME_SHOWN_KEY = 'garden-welcome-shown';
+const TUTORIALS_SEEN_KEY = 'garden-tutorials-seen';
+const TUTORIAL_AGREEMENT_KEY = 'garden-tutorial-agreement';
+const SETTINGS_KEY = 'garden-settings';
+const PRIVACY_MODE_KEY = 'garden-privacy-mode';
 
-const getInitialState = () => {
+type AppView = 'tracker' | 'activity' | 'history' | 'garden';
+
+const TUTORIALS: Record<AppView, TutorialStep[]> = {
+  tracker: [
+    { target: '#progress-display-container', title: 'Tu Progreso Mensual', content: 'Este es el corazón de tu informe. Muestra tu avance hacia la meta. ¡Tócalo para editar tu total de horas!', position: 'bottom' },
+    { target: '#timer-section', title: 'Temporizador Integrado', content: 'Usa el temporizador para registrar tu servicio en tiempo real. ¡No perderás ni un minuto!', position: 'top' },
+    { target: '#streak-indicator', title: 'Tu Racha Diaria', content: '¡Mantén la motivación! Toca aquí para ver los detalles de tu racha y configurar tu día de descanso.', position: 'bottom' },
+    { target: '#add-hours-button', title: 'Añadir Horas y Actividad', content: 'Usa este botón para añadir rápidamente las horas de tus sesiones de predicación o para registrar una revisita o estudio.', position: 'top' },
+  ],
+  garden: [
+    { target: '#garden-path-container', title: 'Tu Jardín Crece Contigo', content: 'A medida que registras horas, este camino crecerá, mostrando tu progreso durante el mes.', position: 'right' },
+    { target: '#flower-0', title: 'Flores de Recompensa', content: 'Alcanza hitos de horas para desbloquear flores. ¡Tócalas para recibir un mensaje animador!', position: 'left' },
+  ],
+  activity: [
+    { target: '#activity-tabs', title: 'Organiza tu Ministerio', content: 'Cambia entre estas pestañas para ver tus grupos, revisitas y estudios bíblicos.', position: 'bottom' },
+    { target: '#import-groups-button', title: 'Importación Inteligente', content: 'Copia el texto de los arreglos de grupo de la semana y pégalo aquí. La IA lo organizará por ti.', position: 'bottom' },
+  ],
+  history: [
+    { target: '#history-year-selector', title: 'Historial Anual', content: 'Usa este selector para ver tu progreso en años de servicio anteriores.', position: 'bottom' },
+    { target: '#month-navigator', title: 'Navega por Mes', content: 'Usa las flechas para moverte entre los meses del año de servicio.', position: 'bottom' },
+    { target: '#calendar-grid', title: 'Calendario Editable', content: 'Cada día muestra tus horas registradas. ¡Toca cualquier día para añadir o editar tus horas!', position: 'top' },
+  ],
+};
+
+const getViewFromHash = (hash: string): AppView => {
+    switch (hash) {
+        case '#/activity':
+            return 'activity';
+        case '#/history':
+            return 'history';
+        case '#/garden':
+            return 'garden';
+        case '#/':
+        case '':
+        default:
+            return 'tracker';
+    }
+};
+
+
+const getInitialState = (): AppState | null => {
   try {
-    const saved = localStorage.getItem(APP_STORAGE_KEY);
+    const saved = localStorage.getItem(APP_STORAGE_key);
     if (!saved) return null;
     const parsed = JSON.parse(saved);
+
+    const today = new Date();
+    const currentServiceYear = getServiceYear(today);
+
+    // Date migration
     if (parsed.currentDate) {
       const d = new Date(parsed.currentDate);
-      parsed.currentDate = !isNaN(d.getTime()) ? d : new Date();
+      parsed.currentDate = !isNaN(d.getTime()) ? d : today;
     } else {
-      parsed.currentDate = new Date();
+      parsed.currentDate = today;
     }
-    if (!parsed.history) {
-      parsed.history = {};
+    
+    // History migration to multi-year archive structure and DayEntry object structure
+    if (parsed.history && !parsed.archives) { // very old structure
+        parsed.archives = {
+            [getServiceYear(parsed.currentDate as Date)]: parsed.history
+        };
+        delete parsed.history;
+    } else if (!parsed.archives) {
+        parsed.archives = {
+            [currentServiceYear]: {}
+        };
     }
+
+    // New DayEntry migration: number -> { hours: number }
+    for (const year in parsed.archives) {
+        const yearHistory = parsed.archives[year];
+        for (const dateKey in yearHistory) {
+            const entry = yearHistory[dateKey];
+            if (typeof entry === 'number') {
+                yearHistory[dateKey] = { hours: entry };
+            }
+        }
+    }
+
+
+    if (!parsed.currentServiceYear) {
+        parsed.currentServiceYear = getServiceYear(parsed.currentDate as Date);
+    }
+    
+    // Streak last log date migration
+    if (parsed.lastLogDate) {
+        const d = new Date(parsed.lastLogDate);
+        parsed.lastLogDate = !isNaN(d.getTime()) ? d : null;
+    }
+
+    if (!parsed.activities) parsed.activities = [];
+    if (!parsed.groupArrangements) parsed.groupArrangements = [];
+
     return parsed;
   } catch (e) {
     console.error("Failed to load state from localStorage", e);
@@ -31,64 +131,251 @@ const getInitialState = () => {
   }
 };
 
+const getSettings = () => {
+    try {
+        const saved = localStorage.getItem(SETTINGS_KEY);
+        if (!saved) return { performanceMode: false, hideGarden: false };
+        return JSON.parse(saved);
+    } catch (e) {
+        console.error("Failed to load settings", e);
+        return { performanceMode: false, hideGarden: false };
+    }
+}
+
+const getInitialPrivacyMode = (): boolean => {
+    try {
+        const saved = localStorage.getItem(PRIVACY_MODE_KEY);
+        return saved === 'true';
+    } catch (e) {
+        console.error("Failed to load privacy mode setting", e);
+        return false;
+    }
+}
+
+
 const App: React.FC = () => {
   const initialState = getInitialState();
+  const initialSettings = getSettings();
+  const isOnline = useOnlineStatus();
+  
+  const initialServiceYear = getServiceYear(initialState?.currentDate ? new Date(initialState.currentDate) : new Date());
 
   const validShapes: Shape[] = ['flower', 'circle', 'heart'];
   const initialShape = initialState?.progressShape;
-  const validatedShape = initialShape && validShapes.includes(initialShape) ? initialShape : 'flower';
+  const validatedShape = initialShape && validShapes.includes(initialShape) ? initialShape : 'circle';
 
-  const [currentHours, setCurrentHours] = useState(initialState?.currentHours ?? 12.5);
+  const validThemeModes: ThemeMode[] = ['light', 'dark', 'black'];
+  const initialThemeMode = initialState?.themeMode;
+  const validatedThemeMode = initialThemeMode && validThemeModes.includes(initialThemeMode) ? initialThemeMode : 'dark';
+
+  const [currentHours, setCurrentHours] = useState(initialState?.currentHours ?? 0);
   const [userName, setUserName] = useState(initialState?.userName ?? 'Precursor');
   const [goal, setGoal] = useState(initialState?.goal ?? 50);
-  const [currentDate, setCurrentDate] = useState(initialState?.currentDate ?? new Date());
+  const [currentDate, setCurrentDate] = useState(initialState?.currentDate ? new Date(initialState.currentDate) : new Date());
   const [progressShape, setProgressShape] = useState<Shape>(validatedShape);
   const [themeColor, setThemeColor] = useState<ThemeColor>(initialState?.themeColor ?? 'blue');
-  const [history, setHistory] = useState<HistoryLog>(initialState?.history ?? {});
-
-
+  const [themeMode, setThemeMode] = useState<ThemeMode>(validatedThemeMode);
+  const [archives, setArchives] = useState<Record<string, HistoryLog>>(initialState?.archives ?? { [initialServiceYear]: {} });
+  const [currentServiceYear, setCurrentServiceYear] = useState(initialState?.currentServiceYear ?? initialServiceYear);
+  const [activities, setActivities] = useState<ActivityItem[]>(initialState?.activities ?? []);
+  const [groupArrangements, setGroupArrangements] = useState<GroupArrangement[]>(initialState?.groupArrangements ?? []);
+  
+  // Streak State
+  const [streak, setStreak] = useState(initialState?.streak ?? 0);
+  const [lastLogDate, setLastLogDate] = useState<Date | null>(initialState?.lastLogDate ? new Date(initialState.lastLogDate) : null);
+  const [streakRestores, setStreakRestores] = useState(initialState?.streakRestores ?? 3);
+  const [lastRestoreMonth, setLastRestoreMonth] = useState(initialState?.lastRestoreMonth ?? new Date().getMonth());
+  const [protectedDay, setProtectedDay] = useState<number | null>(initialState?.protectedDay ?? null);
+  const [showStreakRestoreToast, setShowStreakRestoreToast] = useState(false);
+  
+  const [activeView, setActiveView] = useState<AppView>(getViewFromHash(window.location.hash));
   const [isAddHoursModalOpen, setAddHoursModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
+  const [isStreakModalOpen, setIsStreakModalOpen] = useState(false);
+  const [isEditTotalHoursMode, setIsEditTotalHoursMode] = useState(false);
+  const [dateToEdit, setDateToEdit] = useState<Date | null>(null);
+  const [isGoalReachedModalOpen, setGoalReachedModalOpen] = useState(false);
+  const [isEndOfYearModalOpen, setEndOfYearModalOpen] = useState(false);
+  const [isImportConfirmModalOpen, setImportConfirmModalOpen] = useState(false);
+  const [importedState, setImportedState] = useState<AppState | null>(null);
+
+  const [activityToEdit, setActivityToEdit] = useState<ActivityItem | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isHistoryModalOpen, setHistoryModalOpen] = useState(false);
+  const [isHelpModalOpen, setHelpModalOpen] = useState(false);
   const [isOfflineReady, setIsOfflineReady] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState(Notification.permission);
+  
+  const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [performanceMode, setPerformanceMode] = useState(initialSettings.performanceMode);
+  const [hideGarden, setHideGarden] = useState(initialSettings.hideGarden);
+
+  const [isPrivacyMode, setIsPrivacyMode] = useState(getInitialPrivacyMode());
+
+  const [showWelcome, setShowWelcome] = useState(!localStorage.getItem(WELCOME_SHOWN_KEY));
+
+  const [tutorialsSeen, setTutorialsSeen] = useState<TutorialsSeen>(() => {
+    const saved = localStorage.getItem(TUTORIALS_SEEN_KEY);
+    return saved ? JSON.parse(saved) : {};
+  });
+  const [hasAgreedToTutorials, setHasAgreedToTutorials] = useState(() => {
+    const saved = localStorage.getItem(TUTORIAL_AGREEMENT_KEY);
+    return saved === 'true';
+  });
+  const [activeTutorial, setActiveTutorial] = useState<TutorialStep[] | null>(null);
+  const [tutorialToConfirm, setTutorialToConfirm] = useState<AppView | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Check for new service year on app load
+  useEffect(() => {
+    const today = new Date();
+    const serviceYearOfToday = getServiceYear(today);
+    if (serviceYearOfToday !== currentServiceYear) {
+      setEndOfYearModalOpen(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    const settings = { performanceMode, hideGarden };
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  }, [performanceMode, hideGarden]);
+  
+  useEffect(() => {
+    const handleHashChange = () => {
+        const newView = getViewFromHash(window.location.hash);
+        if (newView === 'garden' && hideGarden) {
+          window.location.hash = '#/';
+        } else {
+          setActiveView(newView);
+        }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    handleHashChange();
+
+    return () => {
+        window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, [hideGarden]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const today = new Date();
+        if (!isSameDay(today, currentDate)) {
+          setCurrentDate(today);
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [currentDate]);
+  
+  useEffect(() => {
+    if (showWelcome || activeTutorial || tutorialToConfirm) return;
+    const tutorialAgreement = localStorage.getItem(TUTORIAL_AGREEMENT_KEY);
+    if (tutorialAgreement === 'false') return;
+    const shouldShowTutorial = !tutorialsSeen[activeView];
+    
+    if (shouldShowTutorial) {
+      if (hasAgreedToTutorials) {
+        const timer = setTimeout(() => setActiveTutorial(TUTORIALS[activeView]), 500);
+        return () => clearTimeout(timer);
+      } else {
+        setTutorialToConfirm(activeView);
+      }
+    }
+  }, [activeView, tutorialsSeen, showWelcome, activeTutorial, tutorialToConfirm, hasAgreedToTutorials]);
+
+  const handleTutorialFinish = (view: AppView) => {
+    const newTutorialsSeen = { ...tutorialsSeen, [view]: true };
+    setTutorialsSeen(newTutorialsSeen);
+    localStorage.setItem(TUTORIALS_SEEN_KEY, JSON.stringify(newTutorialsSeen));
+    setActiveTutorial(null);
+  };
+  
+  const handleStartTutorial = (view: AppView) => {
+    setHasAgreedToTutorials(true);
+    localStorage.setItem(TUTORIAL_AGREEMENT_KEY, 'true');
+    setTutorialsSeen(prev => ({...prev}));
+    setActiveTutorial(TUTORIALS[view]);
+    setTutorialToConfirm(null);
+  };
+  
+  const handleSkipAllTutorials = () => {
+    const allSeen: TutorialsSeen = { tracker: true, garden: true, activity: true, history: true };
+    setTutorialsSeen(allSeen);
+    localStorage.setItem(TUTORIALS_SEEN_KEY, JSON.stringify(allSeen));
+    localStorage.setItem(TUTORIAL_AGREEMENT_KEY, 'false');
+    setTutorialToConfirm(null);
+  };
+
+  const handleReplayTutorial = () => {
+    setHelpModalOpen(false);
+    setTimeout(() => setActiveTutorial(TUTORIALS[activeView]), 300);
+  };
+
+  useEffect(() => {
+    document.body.style.overflow = activeView === 'tracker' ? 'hidden' : 'auto';
+    return () => { document.body.style.overflow = 'auto'; };
+  }, [activeView]);
+
+  const requestNotificationPermission = async () => {
+    if ('Notification' in window) {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+    }
+  };
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/service-worker.js')
           .then(registration => {
-            console.log('ServiceWorker registration successful with scope: ', registration.scope);
-            // Si la instalación fue exitosa, mostramos la notificación
+            console.log('SW registration successful: ', registration.scope);
             if (registration.installing) {
                registration.installing.onstatechange = () => {
-                 if (registration.installing?.state === 'installed') {
-                   setIsOfflineReady(true);
-                 }
+                 if (registration.installing?.state === 'installed') setIsOfflineReady(true);
                };
-            } else if (registration.active) {
-                // Ya estaba activo, no es necesario mostrar el toast de nuevo
             }
           })
-          .catch(error => {
-            console.log('ServiceWorker registration failed: ', error);
-          });
+          .catch(error => console.log('SW registration failed: ', error));
       });
     }
   }, []);
 
   useEffect(() => {
-    const stateToSave = {
+    const root = document.documentElement;
+    root.classList.toggle('dark', themeMode !== 'light');
+    root.classList.toggle('theme-black', themeMode === 'black');
+  }, [themeMode]);
+
+  useEffect(() => {
+    const stateToSave: AppState = {
       currentHours,
       userName,
       goal,
       currentDate: currentDate.toISOString(),
       progressShape,
       themeColor,
-      history,
+      themeMode,
+      archives,
+      currentServiceYear,
+      activities,
+      groupArrangements,
+      streak,
+      lastLogDate: lastLogDate ? lastLogDate.toISOString() : null,
+      streakRestores,
+      lastRestoreMonth,
+      protectedDay,
     };
-    localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(stateToSave));
-  }, [currentHours, userName, goal, currentDate, progressShape, themeColor, history]);
+    localStorage.setItem(APP_STORAGE_key, JSON.stringify(stateToSave));
+  }, [currentHours, userName, goal, currentDate, progressShape, themeColor, themeMode, archives, currentServiceYear, activities, groupArrangements, streak, lastLogDate, streakRestores, lastRestoreMonth, protectedDay]);
+  
+  useEffect(() => {
+    localStorage.setItem(PRIVACY_MODE_KEY, String(isPrivacyMode));
+  }, [isPrivacyMode]);
 
   const formatDateKey = (date: Date): string => {
     const year = date.getFullYear();
@@ -96,16 +383,72 @@ const App: React.FC = () => {
     const day = date.getDate().toString().padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
+  
+  const updateStreak = () => {
+    const today = new Date();
+    
+    if (today.getMonth() !== lastRestoreMonth) {
+        setStreakRestores(3);
+        setLastRestoreMonth(today.getMonth());
+    }
 
-  const handleAddHours = (hoursToAdd: number) => {
+    if (!lastLogDate) {
+        setStreak(1);
+        setLastLogDate(today);
+        return;
+    }
+
+    if (isSameDay(today, lastLogDate)) return;
+
+    const daysDiff = daysBetween(today, lastLogDate);
+
+    if (daysDiff === 1) {
+        setStreak(s => s + 1);
+    } else {
+        let missedDaysAreProtected = true;
+        for (let i = 1; i < daysDiff; i++) {
+            const checkDate = new Date(lastLogDate);
+            checkDate.setDate(checkDate.getDate() + i);
+            if (!(isWeekend(checkDate) || (protectedDay !== null && checkDate.getDay() === protectedDay))) {
+                missedDaysAreProtected = false;
+                break;
+            }
+        }
+
+        if (missedDaysAreProtected) {
+            setStreak(s => s + 1);
+        } else if (streakRestores > 0) {
+            setStreakRestores(r => r - 1);
+            setStreak(s => s + 1);
+            setShowStreakRestoreToast(true);
+        } else {
+            setStreak(1);
+        }
+    }
+    setLastLogDate(today);
+  };
+
+  const handleAddHours = (hoursToAdd: number, weather?: WeatherCondition) => {
     if (hoursToAdd <= 0) return;
-    const dateKey = formatDateKey(currentDate);
-    setHistory(prevHistory => {
-      const newHistory = { ...prevHistory };
-      newHistory[dateKey] = (newHistory[dateKey] || 0) + hoursToAdd;
-      return newHistory;
+    const dateKey = formatDateKey(new Date());
+    setArchives(prev => {
+        const newArchives = { ...prev };
+        const yearHistory = { ...(newArchives[currentServiceYear] || {}) };
+        const oldEntry = yearHistory[dateKey] || { hours: 0 };
+        yearHistory[dateKey] = {
+            hours: oldEntry.hours + hoursToAdd,
+            weather: weather || oldEntry.weather, // Keep old weather if new one isn't provided
+        };
+        newArchives[currentServiceYear] = yearHistory;
+        return newArchives;
     });
-    setCurrentHours(prevHours => prevHours + hoursToAdd);
+    
+    const wasGoalReached = currentHours >= goal;
+    const newHours = currentHours + hoursToAdd;
+    if (!wasGoalReached && newHours >= goal) setGoalReachedModalOpen(true);
+
+    setCurrentHours(newHours);
+    updateStreak();
     setAddHoursModalOpen(false);
   };
 
@@ -114,67 +457,427 @@ const App: React.FC = () => {
     const dateKey = formatDateKey(currentDate);
 
     if (difference !== 0) {
-      setHistory(prevHistory => {
-        const newHistory = { ...prevHistory };
-        newHistory[dateKey] = (newHistory[dateKey] || 0) + difference;
-        return newHistory;
-      });
+        setArchives(prev => {
+            const newArchives = { ...prev };
+            const yearHistory = { ...(newArchives[currentServiceYear] || {}) };
+            const oldEntry = yearHistory[dateKey] || { hours: 0 };
+            yearHistory[dateKey] = { ...oldEntry, hours: oldEntry.hours + difference };
+            newArchives[currentServiceYear] = yearHistory;
+            return newArchives;
+        });
     }
-
+    
+    if (!(currentHours >= goal) && totalHours >= goal) setGoalReachedModalOpen(true);
+    
     setCurrentHours(totalHours);
+    if (totalHours > 0) updateStreak();
     setAddHoursModalOpen(false);
   }
 
+  const handleSetHoursForDate = (newTotalHours: number, date: Date, weather?: WeatherCondition) => {
+    const dateKey = formatDateKey(date);
+    const serviceYear = getServiceYear(date);
+
+    setArchives(prev => {
+      const newArchives = { ...prev };
+      if (!newArchives[serviceYear]) newArchives[serviceYear] = {};
+      const yearHistory = { ...(newArchives[serviceYear]) };
+      const oldEntry = yearHistory[dateKey] || { hours: 0 };
+      
+      const newEntry: DayEntry = {
+          hours: newTotalHours,
+          status: oldEntry.status, // Preserve status
+          weather: weather || oldEntry.weather, // Keep old weather if not specified
+      };
+      
+      if(newEntry.status === 'sick') newEntry.hours = 0;
+
+      if (newEntry.hours > 0 || newEntry.weather || newEntry.status) {
+        yearHistory[dateKey] = newEntry;
+      } else {
+        delete yearHistory[dateKey];
+      }
+      newArchives[serviceYear] = yearHistory;
+
+      const today = currentDate;
+      if (date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth()) {
+        const difference = newTotalHours - oldEntry.hours;
+        setCurrentHours(h => Math.max(0, h + difference));
+      }
+
+      return newArchives;
+    });
+
+    if (newTotalHours > 0) {
+        const today = new Date();
+        if (date.getTime() <= today.getTime()) {
+          if (!lastLogDate || date > lastLogDate) {
+              setLastLogDate(date);
+              if (streak === 0) setStreak(1);
+          }
+        }
+    }
+    handleCloseModal();
+  };
+  
+  const handleMarkDayStatus = (date: Date, status: DayStatus | null) => {
+    const dateKey = formatDateKey(date);
+    const serviceYear = getServiceYear(date);
+
+    setArchives(prev => {
+        const newArchives = { ...prev };
+        if (!newArchives[serviceYear]) newArchives[serviceYear] = {};
+        const yearHistory = { ...(newArchives[serviceYear]) };
+        const oldEntry = yearHistory[dateKey] || { hours: 0 };
+        const oldHours = oldEntry.hours || 0;
+        
+        const newEntry: DayEntry = { ...oldEntry };
+
+        if (status) { // Setting a status
+            newEntry.status = status;
+            newEntry.hours = 0; // Sick days have 0 hours
+        } else { // Clearing a status
+            delete newEntry.status;
+        }
+
+        if (newEntry.hours > 0 || newEntry.weather || newEntry.status) {
+            yearHistory[dateKey] = newEntry;
+        } else {
+            delete yearHistory[dateKey];
+        }
+        
+        newArchives[serviceYear] = yearHistory;
+
+        // Update current month total if status change affected hours
+        const today = currentDate;
+        if (date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth()) {
+            if (status === 'sick' && oldHours > 0) {
+                setCurrentHours(h => Math.max(0, h - oldHours));
+            }
+        }
+        
+        return newArchives;
+    });
+    handleCloseModal();
+  };
+
+  const handleCloseModal = () => {
+    setAddHoursModalOpen(false);
+    setActivityToEdit(null);
+    setDateToEdit(null);
+  };
+
+  const handleSaveActivity = (data: Omit<ActivityItem, 'id' | 'date'>) => {
+    if (activityToEdit) {
+      const updatedActivity = { ...activityToEdit, ...data };
+      setActivities(prev => prev.map(a => a.id === updatedActivity.id ? updatedActivity : a));
+    } else {
+      const newActivity: ActivityItem = { ...data, id: Date.now().toString(), date: new Date().toISOString() };
+      setActivities(prev => [newActivity, ...prev]);
+    }
+    handleCloseModal();
+  };
+
+  const handleDeleteActivity = (activityId: string) => {
+    setActivities(prev => prev.filter(a => a.id !== activityId));
+  };
+
+  const handleStartEditActivity = (activity: ActivityItem) => {
+    setActivityToEdit(activity);
+    setAddHoursModalOpen(true);
+  };
+  
+  const handleDayClickForHistory = (date: Date) => {
+    setDateToEdit(date);
+    setIsEditTotalHoursMode(false);
+    setAddHoursModalOpen(true);
+  };
+
   const openAddModal = () => {
-    setModalMode('add');
+    setActivityToEdit(null);
+    setIsEditTotalHoursMode(false);
+    setDateToEdit(null);
     setAddHoursModalOpen(true);
   };
 
   const openEditModal = () => {
-    setModalMode('edit');
+    setActivityToEdit(null);
+    setIsEditTotalHoursMode(true);
+    setDateToEdit(null);
     setAddHoursModalOpen(true);
   };
 
-  const handleSaveSettings = (newName: string, newGoal: number, newDate: Date, newShape: Shape, newColor: ThemeColor) => {
+  const handleSaveSettings = (newName: string, newGoal: number, newDate: Date, newShape: Shape, newColor: ThemeColor, newMode: ThemeMode) => {
     setUserName(newName);
     setGoal(newGoal);
     setCurrentDate(newDate);
     setProgressShape(newShape);
     setThemeColor(newColor);
+    setThemeMode(newMode);
     setIsSettingsOpen(false);
   };
+  
+  const handleWelcomeFinish = (data: SetupData) => {
+    if (data.name.trim()) setUserName(data.name.trim());
+    
+    const now = new Date();
+    const serviceYear = getServiceYear(now);
+    
+    if (Object.keys(data.previousHours).length > 0) {
+        const yearArchives: Record<string, HistoryLog> = {};
+        let hoursForCurrentMonth = 0;
+        
+        Object.entries(data.previousHours).forEach(([dateKey, hours]) => {
+            if (hours > 0) {
+                const entryDate = new Date(dateKey);
+                const entryServiceYear = getServiceYear(entryDate);
+                if (!yearArchives[entryServiceYear]) {
+                    yearArchives[entryServiceYear] = {};
+                }
+                yearArchives[entryServiceYear][dateKey] = { hours };
+
+                if (entryDate.getFullYear() === now.getFullYear() && entryDate.getMonth() === now.getMonth()) {
+                    hoursForCurrentMonth += hours;
+                }
+            }
+        });
+
+        setCurrentHours(hoursForCurrentMonth);
+        if(hoursForCurrentMonth > 0) updateStreak();
+        setArchives(yearArchives);
+        setCurrentServiceYear(serviceYear);
+    }
+
+    localStorage.setItem(WELCOME_SHOWN_KEY, 'true');
+    setShowWelcome(false);
+    window.location.hash = '#/';
+  };
+
+  const handleSaveArrangements = (arrangements: GroupArrangement[]) => {
+    setGroupArrangements(arrangements);
+  };
+  
+  const handleShowWelcome = () => {
+    localStorage.removeItem(WELCOME_SHOWN_KEY);
+    setShowWelcome(true);
+    setSidebarOpen(false);
+  };
+  
+  const handleArchiveAndStartNewYear = () => {
+    const today = new Date();
+    const newServiceYear = getServiceYear(today);
+    
+    setCurrentServiceYear(newServiceYear);
+    setCurrentHours(0);
+    setArchives(prev => ({ ...prev, [newServiceYear]: {} }));
+    
+    setEndOfYearModalOpen(false);
+  };
+
+  const handleExportData = () => {
+    const stateString = localStorage.getItem(APP_STORAGE_key);
+    if (stateString) {
+      const blob = new Blob([stateString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `garden-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const text = e.target?.result as string;
+          const parsedState = JSON.parse(text) as AppState;
+          // Basic validation
+          if (parsedState.userName && typeof parsedState.currentHours === 'number' && parsedState.archives) {
+            setImportedState(parsedState);
+            setImportConfirmModalOpen(true);
+          } else {
+            alert('El archivo de respaldo no es válido.');
+          }
+        } catch (error) {
+          alert('Error al leer el archivo de respaldo.');
+        }
+      };
+      reader.readAsText(file);
+    }
+    // Reset file input
+    if (event.target) {
+      event.target.value = '';
+    }
+  };
+  
+  const handleConfirmImport = () => {
+    if (importedState) {
+        const newCurrentDate = new Date(importedState.currentDate);
+        setUserName(importedState.userName);
+        setGoal(importedState.goal);
+        setCurrentDate(newCurrentDate);
+        setProgressShape(importedState.progressShape);
+        setThemeColor(importedState.themeColor);
+        setThemeMode(importedState.themeMode);
+        setArchives(importedState.archives);
+        setCurrentServiceYear(importedState.currentServiceYear);
+        setCurrentHours(importedState.currentHours);
+        setActivities(importedState.activities);
+        setGroupArrangements(importedState.groupArrangements);
+        setStreak(importedState.streak);
+        setLastLogDate(importedState.lastLogDate ? new Date(importedState.lastLogDate) : null);
+        setStreakRestores(importedState.streakRestores);
+        setLastRestoreMonth(importedState.lastRestoreMonth);
+        setProtectedDay(importedState.protectedDay);
+    }
+    setImportConfirmModalOpen(false);
+    setImportedState(null);
+  };
+
+  const viewTitleMap: Record<AppView, string> = {
+    tracker: 'Garden',
+    activity: 'Actividad',
+    history: 'Historial',
+    garden: 'Mi Jardín',
+  };
+  const viewTitle = viewTitleMap[activeView];
+
+
+  const renderContent = () => {
+    switch (activeView) {
+      case 'tracker':
+        return (
+          <>
+            <ServiceTracker 
+              currentHours={currentHours} 
+              goal={goal}
+              currentDate={currentDate}
+              onEditClick={openEditModal} 
+              onAddHours={handleAddHours}
+              progressShape={progressShape}
+              themeColor={themeColor}
+              onSettingsClick={() => setIsSettingsOpen(true)}
+              onHelpClick={() => setHelpModalOpen(true)}
+              notificationPermission={notificationPermission}
+              onRequestNotificationPermission={requestNotificationPermission}
+              performanceMode={performanceMode}
+              isPrivacyMode={isPrivacyMode}
+              onTogglePrivacyMode={() => setIsPrivacyMode(p => !p)}
+            />
+            <GreetingCard userName={userName} themeColor={themeColor} performanceMode={performanceMode} />
+          </>
+        );
+      case 'garden':
+        return <GardenView 
+                  currentHours={currentHours}
+                  goal={goal}
+                  themeColor={themeColor}
+                  performanceMode={performanceMode}
+                  isPrivacyMode={isPrivacyMode}
+                />;
+      case 'activity':
+        return <ActivityView 
+                  activities={activities}
+                  groupArrangements={groupArrangements}
+                  onSaveArrangements={handleSaveArrangements}
+                  themeColor={themeColor} 
+                  onEdit={handleStartEditActivity}
+                  onDelete={handleDeleteActivity}
+                  isOnline={isOnline}
+                  performanceMode={performanceMode}
+                  currentDate={currentDate}
+                />;
+      case 'history':
+        return <HistoryView 
+          archives={archives}
+          currentServiceYear={currentServiceYear}
+          themeColor={themeColor}
+          isPrivacyMode={isPrivacyMode}
+          onDayClick={handleDayClickForHistory}
+          activities={activities}
+        />;
+      default:
+        return null;
+    }
+  }
+
+  if (showWelcome) {
+    return <Welcome 
+        onFinish={handleWelcomeFinish} 
+        themeColor={themeColor} 
+        performanceMode={performanceMode}
+        themeMode={themeMode}
+        progressShape={progressShape}
+        setThemeColor={setThemeColor}
+        setThemeMode={setThemeMode}
+        setProgressShape={setProgressShape}
+      />;
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800">
-      <Header userName={userName} />
+    <div className="min-h-screen text-slate-800 dark:text-slate-200">
+      <Header 
+        title={viewTitle} 
+        themeColor={themeColor} 
+        streak={streak}
+        onStreakClick={() => setIsStreakModalOpen(true)}
+        onMenuClick={() => setSidebarOpen(true)}
+      />
+
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        performanceMode={performanceMode}
+        onSetPerformanceMode={setPerformanceMode}
+        hideGarden={hideGarden}
+        onSetHideGarden={setHideGarden}
+        onShowWelcome={handleShowWelcome}
+        onExport={handleExportData}
+        onImport={handleImportClick}
+        themeColor={themeColor}
+      />
+      <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" className="hidden" />
       
-      <main className="pt-24 pb-28 flex justify-center">
-        <ServiceTracker 
-          currentHours={currentHours} 
-          goal={goal}
-          currentDate={currentDate}
-          onEditClick={openEditModal} 
-          onAddHours={handleAddHours}
-          progressShape={progressShape}
-          themeColor={themeColor}
-        />
+      <main className="pt-24 pb-28">
+        <div className="px-4 animate-fadeIn">
+          {renderContent()}
+        </div>
       </main>
 
       <BottomNav 
+        activeView={activeView}
         onAddClick={openAddModal} 
-        onHistoryClick={() => setHistoryModalOpen(true)}
-        onSettingsClick={() => setIsSettingsOpen(true)} 
-        themeColor={themeColor} 
+        themeColor={themeColor}
+        isGardenHidden={hideGarden}
+        performanceMode={performanceMode}
       />
 
       <AddHoursModal 
         isOpen={isAddHoursModalOpen}
-        onClose={() => setAddHoursModalOpen(false)}
+        onClose={handleCloseModal}
         onAddHours={handleAddHours}
         onSetHours={handleSetHours}
-        mode={modalMode}
+        onSaveActivity={handleSaveActivity}
+        activityToEdit={activityToEdit}
         currentHours={currentHours}
+        isEditMode={isEditTotalHoursMode}
         themeColor={themeColor}
+        performanceMode={performanceMode}
+        dateForEntry={dateToEdit}
+        onSetHoursForDate={handleSetHoursForDate}
+        onMarkDayStatus={handleMarkDayStatus}
+        archives={archives}
+        activities={activities}
       />
 
       <SettingsModal
@@ -186,16 +889,75 @@ const App: React.FC = () => {
         currentDate={currentDate}
         currentShape={progressShape}
         currentColor={themeColor}
+        currentThemeMode={themeMode}
+        performanceMode={performanceMode}
       />
 
-      <HistoryModal
-        isOpen={isHistoryModalOpen}
-        onClose={() => setHistoryModalOpen(false)}
-        history={history}
-        currentDate={currentDate}
+      <HelpModal
+        isOpen={isHelpModalOpen}
+        onClose={() => setHelpModalOpen(false)}
+        onReplayTutorial={handleReplayTutorial}
+        themeColor={themeColor}
+        performanceMode={performanceMode}
+      />
+
+      <StreakModal
+        isOpen={isStreakModalOpen}
+        onClose={() => setIsStreakModalOpen(false)}
+        streak={streak}
+        streakRestores={streakRestores}
+        themeColor={themeColor}
+        protectedDay={protectedDay}
+        onSetProtectedDay={setProtectedDay}
+        performanceMode={performanceMode}
+      />
+
+      <GoalReachedModal
+        isOpen={isGoalReachedModalOpen}
+        onClose={() => setGoalReachedModalOpen(false)}
+        userName={userName}
+        goal={goal}
+        themeColor={themeColor}
+        performanceMode={performanceMode}
+      />
+
+      <EndOfYearModal
+        isOpen={isEndOfYearModalOpen}
+        onArchive={handleArchiveAndStartNewYear}
+        onLater={() => setEndOfYearModalOpen(false)}
+        themeColor={themeColor}
+        performanceMode={performanceMode}
+        previousYear={currentServiceYear}
+      />
+      
+      <ConfirmationModal
+        isOpen={isImportConfirmModalOpen}
+        onClose={() => { setImportConfirmModalOpen(false); setImportedState(null); }}
+        onConfirm={handleConfirmImport}
+        title="Confirmar Importación"
+        message="Esto reemplazará todos tus datos actuales con los del archivo. ¿Estás seguro de que quieres continuar?"
+        confirmText="Sí, importar datos"
+        themeColor={themeColor}
+      />
+
+      <TutorialConfirmationModal
+        isOpen={!!tutorialToConfirm}
+        onStart={() => handleStartTutorial(tutorialToConfirm!)}
+        onSkip={handleSkipAllTutorials}
+        themeColor={themeColor}
+        viewName={tutorialToConfirm ? viewTitleMap[tutorialToConfirm] : ''}
+        performanceMode={performanceMode}
+      />
+
+      <InteractiveTutorial
+        steps={activeTutorial}
+        onFinish={() => handleTutorialFinish(activeView)}
+        themeColor={themeColor}
+        performanceMode={performanceMode}
       />
 
       <OfflineToast isVisible={isOfflineReady} onDismiss={() => setIsOfflineReady(false)} />
+      <StreakRestoreToast isVisible={showStreakRestoreToast} onDismiss={() => setShowStreakRestoreToast(false)} />
     </div>
   );
 };

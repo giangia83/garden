@@ -3,14 +3,16 @@ import React from 'react';
 export const CalendarIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
+    fill="none"
     viewBox="0 0 24 24"
-    fill="currentColor"
+    strokeWidth={1.5}
+    stroke="currentColor"
     {...props}
   >
     <path
-      fillRule="evenodd"
-      d="M5.25 2.25A3.75 3.75 0 0 0 1.5 6v12A3.75 3.75 0 0 0 5.25 21.75h13.5A3.75 3.75 0 0 0 22.5 18V6a3.75 3.75 0 0 0-3.75-3.75H5.25Zm0 3.75h13.5a.75.75 0 0 1 .75.75v3h-15V6.75a.75.75 0 0 1 .75-.75Zm-1.5 6h16.5v6a.75.75 0 0 1-.75.75H5.25a.75.75 0 0 1-.75-.75v-6Z"
-      clipRule="evenodd"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0h18M-9 11.25h.008v.008H-9v-.008z"
     />
   </svg>
 );

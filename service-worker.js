@@ -14,46 +14,94 @@ const URLS_TO_CACHE = [
   'https://aistudiocdn.com/react@^19.2.0/'
 ];
 
+const APP_STORAGE_KEY = 'garden-service-tracker';
+const TIMER_STORAGE = {
+  START_TIME: 'timer_startTime',
+  BASE_TIME: 'timer_baseTime',
+};
+const NOTIFICATION_TAG = 'garden-timer';
+
 self.addEventListener('install', (event) => {
-  // Realiza la instalación: abre la caché y añade los recursos.
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('Opened cache and caching app shell');
-        return cache.addAll(URLS_TO_CACHE);
-      })
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(URLS_TO_CACHE))
   );
 });
 
 self.addEventListener('fetch', (event) => {
-  // Estrategia "Cache First": responde desde la caché si es posible.
-  // Si no está en caché, va a la red.
   event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Si encontramos una respuesta en la caché, la devolvemos.
-        if (response) {
-          return response;
-        }
-        // Si no, intentamos obtenerla de la red.
-        return fetch(event.request);
-      })
+    caches.match(event.request).then((response) => response || fetch(event.request))
   );
 });
 
 self.addEventListener('activate', (event) => {
-  // Limpia cachés antiguas para evitar conflictos.
   const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
+    caches.keys().then((cacheNames) =>
+      Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
-            console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
-      );
-    })
+      )
+    )
   );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  if (event.notification.tag !== NOTIFICATION_TAG) {
+    return;
+  }
+  
+  const handleAction = async (action) => {
+    const startTime = localStorage.getItem(TIMER_STORAGE.START_TIME);
+    const baseTime = parseFloat(localStorage.getItem(TIMER_STORAGE.BASE_TIME) || '0');
+
+    if (!startTime) return; // Timer wasn't running
+
+    const elapsed = (Date.now() - parseFloat(startTime)) / 1000;
+    const newBaseTime = baseTime + elapsed;
+
+    if (action === 'pause') {
+      localStorage.setItem(TIMER_STORAGE.BASE_TIME, String(newBaseTime));
+      localStorage.removeItem(TIMER_STORAGE.START_TIME);
+    } else if (action === 'finish') {
+      const hoursToAdd = newBaseTime / 3600;
+      
+      // Reset timer
+      localStorage.removeItem(TIMER_STORAGE.BASE_TIME);
+      localStorage.removeItem(TIMER_STORAGE.START_TIME);
+
+      if (hoursToAdd <= 0.01) return;
+
+      // Update main app state
+      const appStateString = localStorage.getItem(APP_STORAGE_KEY);
+      if (appStateString) {
+        try {
+          const appState = JSON.parse(appStateString);
+          
+          const formatDateKey = (date) => {
+            const year = date.getFullYear();
+            const month = (date.getMonth() + 1).toString().padStart(2, '0');
+            const day = date.getDate().toString().padStart(2, '0');
+            return `${year}-${month}-${day}`;
+          };
+          
+          const dateKey = formatDateKey(new Date());
+          
+          appState.currentHours = (appState.currentHours || 0) + hoursToAdd;
+          appState.history = appState.history || {};
+          appState.history[dateKey] = (appState.history[dateKey] || 0) + hoursToAdd;
+          
+          localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(appState));
+        } catch(e) {
+          console.error("SW: Failed to update app state.", e);
+        }
+      }
+    }
+  };
+
+  event.waitUntil(handleAction(event.action));
 });
