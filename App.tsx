@@ -29,6 +29,7 @@ const TUTORIALS_SEEN_KEY = 'garden-tutorials-seen';
 const TUTORIAL_AGREEMENT_KEY = 'garden-tutorial-agreement';
 const SETTINGS_KEY = 'garden-settings';
 const PRIVACY_MODE_KEY = 'garden-privacy-mode';
+const REMINDER_LAST_SENT_KEY = 'garden-reminder-last-sent';
 
 type AppView = 'tracker' | 'activity' | 'history' | 'garden';
 
@@ -134,11 +135,17 @@ const getInitialState = (): AppState | null => {
 const getSettings = () => {
     try {
         const saved = localStorage.getItem(SETTINGS_KEY);
-        if (!saved) return { performanceMode: false, hideGarden: false };
-        return JSON.parse(saved);
+        if (!saved) return { performanceMode: false, hideGarden: false, remindersEnabled: false, reminderTime: '10:00' };
+        const parsed = JSON.parse(saved);
+        return {
+            performanceMode: parsed.performanceMode ?? false,
+            hideGarden: parsed.hideGarden ?? false,
+            remindersEnabled: parsed.remindersEnabled ?? false,
+            reminderTime: parsed.reminderTime ?? '10:00',
+        };
     } catch (e) {
         console.error("Failed to load settings", e);
-        return { performanceMode: false, hideGarden: false };
+        return { performanceMode: false, hideGarden: false, remindersEnabled: false, reminderTime: '10:00' };
     }
 }
 
@@ -207,6 +214,8 @@ const App: React.FC = () => {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [performanceMode, setPerformanceMode] = useState(initialSettings.performanceMode);
   const [hideGarden, setHideGarden] = useState(initialSettings.hideGarden);
+  const [remindersEnabled, setRemindersEnabled] = useState(initialSettings.remindersEnabled);
+  const [reminderTime, setReminderTime] = useState(initialSettings.reminderTime);
 
   const [isPrivacyMode, setIsPrivacyMode] = useState(getInitialPrivacyMode());
 
@@ -235,9 +244,9 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const settings = { performanceMode, hideGarden };
+    const settings = { performanceMode, hideGarden, remindersEnabled, reminderTime };
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-  }, [performanceMode, hideGarden]);
+  }, [performanceMode, hideGarden, remindersEnabled, reminderTime]);
   
   useEffect(() => {
     const handleHashChange = () => {
@@ -288,6 +297,38 @@ const App: React.FC = () => {
     }
   }, [activeView, tutorialsSeen, showWelcome, activeTutorial, tutorialToConfirm, hasAgreedToTutorials]);
 
+  // Daily Reminder Logic
+  useEffect(() => {
+    if (!remindersEnabled || notificationPermission !== 'granted' || !reminderTime) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      const now = new Date();
+      const lastSentDateStr = localStorage.getItem(REMINDER_LAST_SENT_KEY);
+      const todayStr = now.toISOString().split('T')[0];
+
+      if (lastSentDateStr === todayStr) {
+        return; // Already sent today
+      }
+
+      const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      
+      if (currentTime === reminderTime) {
+        navigator.serviceWorker.ready.then(registration => {
+            registration.showNotification('Garden: ¡Hora de servir!', {
+                body: 'Un recordatorio amigable para registrar tu actividad de hoy. 🌱',
+                icon: '/assets/icon-192x192.svg',
+                tag: 'garden-daily-reminder',
+            });
+        });
+        localStorage.setItem(REMINDER_LAST_SENT_KEY, todayStr);
+      }
+    }, 60000); // Check every minute
+
+    return () => clearInterval(intervalId);
+  }, [remindersEnabled, reminderTime, notificationPermission]);
+
   const handleTutorialFinish = (view: AppView) => {
     const newTutorialsSeen = { ...tutorialsSeen, [view]: true };
     setTutorialsSeen(newTutorialsSeen);
@@ -326,6 +367,13 @@ const App: React.FC = () => {
       const permission = await Notification.requestPermission();
       setNotificationPermission(permission);
     }
+  };
+
+  const handleSetRemindersEnabled = (enabled: boolean) => {
+    if (enabled && notificationPermission !== 'granted') {
+      requestNotificationPermission();
+    }
+    setRemindersEnabled(enabled);
   };
 
   useEffect(() => {
@@ -845,6 +893,10 @@ const App: React.FC = () => {
         onExport={handleExportData}
         onImport={handleImportClick}
         themeColor={themeColor}
+        remindersEnabled={remindersEnabled}
+        onSetRemindersEnabled={handleSetRemindersEnabled}
+        reminderTime={reminderTime}
+        onSetReminderTime={setReminderTime}
       />
       <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" className="hidden" />
       

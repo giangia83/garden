@@ -9,7 +9,7 @@ import { HomeModernIcon } from './icons/HomeModernIcon';
 import { GardenIcon } from './icons/GardenIcon';
 import { ArrowDownTrayIcon } from './icons/ArrowDownTrayIcon';
 import { ArrowUpTrayIcon } from './icons/ArrowUpTrayIcon';
-import { ArchiveBoxIcon } from './icons/ArchiveBoxIcon';
+import { BellIcon } from './icons/BellIcon';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -22,6 +22,10 @@ interface SidebarProps {
   onExport: () => void;
   onImport: () => void;
   themeColor: ThemeColor;
+  remindersEnabled: boolean;
+  onSetRemindersEnabled: (enabled: boolean) => void;
+  reminderTime: string;
+  onSetReminderTime: (time: string) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -35,6 +39,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   onExport,
   onImport,
   themeColor,
+  remindersEnabled,
+  onSetRemindersEnabled,
+  reminderTime,
+  onSetReminderTime,
 }) => {
   const [hasBeenOpened, setHasBeenOpened] = useState(false);
   const theme = THEMES[themeColor] || THEMES.blue;
@@ -92,6 +100,30 @@ const Sidebar: React.FC<SidebarProps> = ({
                         </div>
                     </div>
                     <ToggleSwitch checked={hideGarden} onChange={onSetHideGarden} themeColor={themeColor}/>
+                </div>
+                <div className="p-3">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                            <BellIcon className={`w-6 h-6 mr-3 ${theme.text}`} />
+                            <div>
+                                <p className="font-semibold text-slate-700 dark:text-slate-200">Recordatorio Diario</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">Recibe una notificación.</p>
+                            </div>
+                        </div>
+                        <ToggleSwitch checked={remindersEnabled} onChange={onSetRemindersEnabled} themeColor={themeColor}/>
+                    </div>
+                    {remindersEnabled && (
+                        <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700/80">
+                            <label htmlFor="reminder-time" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Hora del recordatorio</label>
+                            <input 
+                                id="reminder-time"
+                                type="time" 
+                                value={reminderTime} 
+                                onChange={e => onSetReminderTime(e.target.value)} 
+                                className={`w-full px-3 py-1.5 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 ${theme.ring} outline-none transition text-center`}
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

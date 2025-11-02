@@ -393,7 +393,14 @@ const Welcome: React.FC<WelcomeProps> = ({
                       </div>
                       <h2 className={`text-3xl font-bold ${isFinalFeatureSlide ? 'text-white' : 'text-slate-900 dark:text-white'} mb-3 tracking-tight`}>{slide.title}</h2>
                       <p className={`${isFinalFeatureSlide ? 'text-slate-200' : 'text-slate-600 dark:text-slate-400'} max-w-sm leading-relaxed`}>
-                        {typeof slide.description === 'function' ? slide.description(setupData.name) : slide.description}
+                        {(() => {
+                          // FIX: The type of slide.description is a union that includes a function, which is not a valid ReactNode.
+                          // This IIFE correctly calls the function if it exists, ensuring a valid ReactNode is always returned for rendering, resolving a TypeScript type inference issue.
+                          if (typeof slide.description === 'function') {
+                            return slide.description(setupData.name);
+                          }
+                          return slide.description;
+                        })()}
                       </p>
                     </>
                   )}

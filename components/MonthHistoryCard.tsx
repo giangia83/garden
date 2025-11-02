@@ -35,7 +35,8 @@ const MonthHistoryCard: React.FC<MonthHistoryCardProps> = ({
 
   const dailyEntries = useMemo(() => {
     return Object.entries(history)
-      .map(([dateStr, hours]) => ({ date: new Date(dateStr + 'T12:00:00Z'), hours }))
+      // FIX: The 'hours' variable was a DayEntry object. Destructure to get the numeric 'hours' property.
+      .map(([dateStr, dayEntry]) => ({ date: new Date(dateStr + 'T12:00:00Z'), hours: dayEntry.hours }))
       .filter(entry => 
         !isNaN(entry.date.getTime()) &&
         entry.date.getUTCFullYear() === year && 
