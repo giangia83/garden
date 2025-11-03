@@ -1,10 +1,10 @@
-
 import React, { useMemo } from 'react';
-import { HistoryLog, ThemeColor, DayEntry, ActivityItem } from '../types';
+import { HistoryLog, ThemeColor, DayEntry, ActivityItem, PlanningData } from '../types';
 import { THEMES } from '../constants';
-import { hoursToHHMM } from '../utils';
+import { hoursToHHMM, formatDateKey } from '../utils';
 import { BookOpenIcon } from './icons/BookOpenIcon';
 import { BuildingOfficeIcon } from './icons/BuildingOfficeIcon';
+import { ClipboardDocumentListIcon } from './icons/ClipboardDocumentListIcon';
 
 interface CalendarGridProps {
   selectedMonth: Date;
@@ -15,6 +15,8 @@ interface CalendarGridProps {
   activities: ActivityItem[];
   isSummaryMonth: boolean;
   commemorationDate: Date | null;
+  carryoverHours: number;
+  planningData: PlanningData;
 }
 
 type CalendarDay = {
@@ -22,6 +24,7 @@ type CalendarDay = {
     isCurrentMonth: boolean;
     dayEntry?: DayEntry;
     hasActivity: boolean;
+    hasPlan: boolean;
 }
 
 const WEEK_DAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
@@ -35,6 +38,8 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   activities,
   isSummaryMonth,
   commemorationDate,
+  carryoverHours,
+  planningData,
 }) => {
   const theme = THEMES[themeColor] || THEMES.blue;
   const privacyBlur = isPrivacyMode ? 'blur-sm select-none pointer-events-none' : '';
@@ -82,35 +87,41 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
     for (let i = 0; i < startDayOfWeek; i++) {
       const date = new Date(firstDayOfMonth);
       date.setDate(date.getDate() - (startDayOfWeek - i));
+      const dateKey = formatDateKey(date);
+      const dayBlocks = planningData[dateKey] || [];
       const hasActivity = activityDates.has(`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`);
-      days.push({ date, isCurrentMonth: false, hasActivity });
+      days.push({ date, isCurrentMonth: false, hasActivity, hasPlan: dayBlocks.length > 0 });
     }
 
     for (let i = 1; i <= lastDayOfMonth.getDate(); i++) {
       const date = new Date(year, month, i);
-      const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+      const dateKey = formatDateKey(date);
+      const dayBlocks = planningData[dateKey] || [];
       const hasActivity = activityDates.has(`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`);
-      days.push({ date, isCurrentMonth: true, dayEntry: historyLog[dateKey], hasActivity });
+      days.push({ date, isCurrentMonth: true, dayEntry: historyLog[dateKey], hasActivity, hasPlan: dayBlocks.length > 0 });
     }
 
     const lastDayOfWeek = (lastDayOfMonth.getDay() + 6) % 7;
     for (let i = 1; i < 7 - lastDayOfWeek; i++) {
       const date = new Date(lastDayOfMonth);
       date.setDate(date.getDate() + i);
+      const dateKey = formatDateKey(date);
+      const dayBlocks = planningData[dateKey] || [];
       const hasActivity = activityDates.has(`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`);
-      days.push({ date, isCurrentMonth: false, hasActivity });
+      days.push({ date, isCurrentMonth: false, hasActivity, hasPlan: dayBlocks.length > 0 });
     }
 
     return days;
-  }, [selectedMonth, historyLog, activityDates]);
+  }, [selectedMonth, historyLog, activityDates, planningData]);
   
   const monthTotalHours = useMemo(() => {
     if (isSummaryMonth) {
       const monthKey = `${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, '0')}-SUMMARY`;
       return historyLog[monthKey]?.hours || 0;
     }
-    return calendarDays.reduce((total, day) => total + (day.isCurrentMonth ? (day.dayEntry?.hours || 0) : 0), 0);
-  }, [calendarDays, isSummaryMonth, selectedMonth, historyLog]);
+    const dailyTotal = calendarDays.reduce((total, day) => total + (day.isCurrentMonth ? (day.dayEntry?.hours || 0) : 0), 0);
+    return dailyTotal + carryoverHours;
+  }, [calendarDays, isSummaryMonth, selectedMonth, historyLog, carryoverHours]);
 
   const activeDaysCount = useMemo(() => {
     if (isSummaryMonth) return 0;
@@ -123,7 +134,8 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
             {WEEK_DAYS.map((day, i) => (
                 <div key={`${day}-${i}`} className="text-center text-xs font-bold text-slate-400 dark:text-slate-500 pb-2">{day}</div>
             ))}
-            {calendarDays.map(({ date, isCurrentMonth, dayEntry, hasActivity }, index) => {
+            {calendarDays.map((day, index) => {
+                const { date, isCurrentMonth, dayEntry, hasActivity, hasPlan } = day;
                 const isToday = new Date().toDateString() === date.toDateString();
                 const hours = dayEntry?.hours || 0;
                 const ldcHours = dayEntry?.ldcHours || 0;
@@ -137,7 +149,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                 const isCampaign = dayEntry?.isCampaign;
                 const hasRecurringActivity = !isSummaryMonth && isCurrentMonth && recurringActivitiesByDayOfWeek.has(date.getDay());
 
-                const dayClasses = ['relative h-16 flex flex-col items-center justify-center rounded-lg transition-colors'];
+                const dayClasses = ['relative h-16 flex flex-col items-center justify-center rounded-lg'];
 
                 if (isCurrentMonth && !isSummaryMonth) dayClasses.push('cursor-pointer');
                 else dayClasses.push('pointer-events-none');
@@ -177,6 +189,9 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                     >
                         {isCurrentMonth && (hasActivity || hasRecurringActivity) && !isSummaryMonth && (
                             <div className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ${hasRecurringActivity ? 'bg-purple-500' : theme.bg}`}></div>
+                        )}
+                        {hasPlan && !isSummaryMonth && (
+                           <ClipboardDocumentListIcon className="absolute bottom-1.5 left-1.5 w-4 h-4 text-slate-400 dark:text-slate-500" />
                         )}
                         {hasRecurringActivity && !isSummaryMonth &&
                             <BookOpenIcon className="absolute top-1.5 left-1.5 w-4 h-4 text-slate-500 dark:text-slate-400" />

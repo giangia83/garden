@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { ThemeColor } from '../types';
 import { THEMES } from '../constants';
 import { GardenIcon } from './icons/GardenIcon';
-import { HeartIcon } from './icons/HeartIcon';
 import { InformationCircleIcon } from './icons/InformationCircleIcon';
 import { ShieldCheckIcon } from './icons/ShieldCheckIcon';
 import { isWeekend } from '../utils';
@@ -11,7 +10,6 @@ interface StreakModalProps {
   isOpen: boolean;
   onClose: () => void;
   streak: number;
-  streakRestores: number;
   themeColor: ThemeColor;
   protectedDay: number | null;
   onSetProtectedDay: (day: number | null) => void;
@@ -30,7 +28,6 @@ const StreakModal: React.FC<StreakModalProps> = ({
   isOpen,
   onClose,
   streak,
-  streakRestores,
   themeColor,
   protectedDay,
   onSetProtectedDay,
@@ -89,16 +86,6 @@ const StreakModal: React.FC<StreakModalProps> = ({
 
             <div className="w-full text-center space-y-4">
                 <div>
-                    <h3 className="text-md font-semibold text-slate-700 dark:text-slate-300">Restauradores de Racha</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Disponibles este mes:</p>
-                    <div className="flex items-center justify-center space-x-2">
-                        {Array.from({ length: 3 }).map((_, i) => (
-                            <HeartIcon key={i} className={`w-7 h-7 transition-all duration-300 ${i < streakRestores ? 'text-pink-500 animate-pulse' : 'text-slate-300 dark:text-slate-600'}`} />
-                        ))}
-                    </div>
-                </div>
-
-                <div>
                     <h3 className="text-md font-semibold text-slate-700 dark:text-slate-300">Día de descanso semanal</h3>
                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Elige un día para proteger tu racha, además del fin de semana.</p>
                     <div className="flex justify-center gap-2">
@@ -106,7 +93,7 @@ const StreakModal: React.FC<StreakModalProps> = ({
                             <button 
                                 key={day.value}
                                 onClick={() => handleDayClick(day.value)}
-                                className={`w-10 h-10 rounded-full font-bold text-sm flex items-center justify-center transition-all duration-200 border-2 ${
+                                className={`w-10 h-10 rounded-full font-bold text-sm flex items-center justify-center border-2 ${
                                     protectedDay === day.value 
                                     ? `${theme.bg} text-white border-transparent shadow-md` 
                                     : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-transparent hover:border-slate-400'
@@ -127,8 +114,8 @@ const StreakModal: React.FC<StreakModalProps> = ({
                 {showHelp && (
                      <div className="mt-4 text-xs text-left text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700/50 p-3 rounded-lg space-y-2 animate-fadeIn">
                         <p>✅ Tu racha aumenta por cada día consecutivo que registras horas.</p>
-                        <p>🛡️ Los <strong>sábados, domingos y tu día de descanso</strong> no rompen tu racha.</p>
-                        <p>❤️ Si olvidas registrar horas un día normal, se usará un <strong>restaurador automático</strong> para salvar tu racha (tienes 3 cada mes).</p>
+                        <p>🛡️ Los <strong>sábados, domingos y tu día de descanso</strong> semanal no rompen tu racha.</p>
+                        <p>❗️ Si olvidas registrar horas un día no protegido, tu racha se reiniciará.</p>
                     </div>
                 )}
             </div>

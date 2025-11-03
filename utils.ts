@@ -149,3 +149,15 @@ export const getCommemorationDate = (serviceYear: string): Date | null => {
     // Add T12:00:00Z to avoid timezone issues where the date could be off by one.
     return new Date(dateStr + 'T12:00:00Z'); 
 };
+
+/**
+ * Formats a Date object into a "YYYY-MM-DD" string key.
+ * @param date - The date to format.
+ * @returns A string key like "2023-09-01".
+ */
+export const formatDateKey = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};

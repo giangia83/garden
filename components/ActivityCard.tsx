@@ -33,10 +33,10 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, themeColor, onEdi
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200/50 dark:border-slate-700 p-4 space-y-3 relative">
       <div className="absolute top-3 right-3 flex items-center space-x-2">
-        <button onClick={() => onEdit(activity)} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+        <button onClick={() => onEdit(activity)} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700">
           <PencilIcon className="w-5 h-5" />
         </button>
-        <button onClick={() => onDelete(activity.id)} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-red-500 rounded-full hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors">
+        <button onClick={() => onDelete(activity.id)} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-red-500 rounded-full hover:bg-red-50 dark:hover:bg-red-500/10">
           <TrashIcon className="w-5 h-5" />
         </button>
       </div>

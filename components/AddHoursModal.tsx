@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ThemeColor, ActivityItem, ActivityType, HistoryLog, WeatherCondition, DayStatus, DayEntry } from '../types';
+import { ThemeColor, ActivityItem, ActivityType, HistoryLog, WeatherCondition, DayStatus, DayEntry, PlanningData, PlanningBlock, UserRole } from '../types';
 import { THEMES } from '../constants';
 import { UserIcon } from './icons/UserIcon';
 import { LocationMarkerIcon } from './icons/LocationMarkerIcon';
 import { DocumentTextIcon } from './icons/DocumentTextIcon';
-import { hoursToHHMM, flexibleInputToHours, getServiceYear } from '../utils';
+import { hoursToHHMM, flexibleInputToHours, getServiceYear, formatDateKey } from '../utils';
 import { SunIcon } from './icons/SunIcon';
 import { CloudIcon } from './icons/CloudIcon';
 import { RainIcon } from './icons/RainIcon';
@@ -37,6 +37,8 @@ interface AddHoursModalProps {
   onMarkDayStatus: (date: Date, status: DayStatus | null) => void;
   archives: Record<string, HistoryLog>;
   activities: ActivityItem[];
+  planningData: PlanningData;
+  userRole: UserRole;
 }
 
 type ModalTab = 'hours' | 'ldc' | 'visit' | 'study';
@@ -45,6 +47,14 @@ const weatherOptions: { id: WeatherCondition, Icon: React.FC<React.SVGProps<SVGS
     { id: 'sunny', Icon: SunIcon, label: 'Soleado', selectedClass: 'text-yellow-600 border-yellow-400 bg-yellow-50 dark:bg-yellow-500/10 dark:border-yellow-500/30' },
     { id: 'cloudy', Icon: CloudIcon, label: 'Nublado', selectedClass: 'text-slate-600 border-slate-400 bg-slate-100 dark:bg-slate-600/20 dark:border-slate-500/30' },
     { id: 'bad', Icon: RainIcon, label: 'Lluvioso/Ventoso', selectedClass: 'text-blue-600 border-blue-400 bg-blue-50 dark:bg-blue-500/10 dark:border-blue-500/30' },
+];
+
+const quickAddHours = [
+    { label: '1h', value: 1 },
+    { label: '1:30h', value: 1.5 },
+    { label: '2h', value: 2 },
+    { label: '3h', value: 3 },
+    { label: '4h', value: 4 },
 ];
 
 const AddHoursModal: React.FC<AddHoursModalProps> = ({
@@ -69,6 +79,8 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
   onMarkDayStatus,
   archives,
   activities,
+  planningData,
+  userRole,
 }) => {
   const [activeTab, setActiveTab] = useState<ModalTab>('hours');
   
@@ -88,6 +100,7 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
 
   const [hasBeenOpened, setHasBeenOpened] = useState(false);
   const theme = THEMES[themeColor] || THEMES.blue;
+  const isPioneer = userRole !== 'publisher';
 
   const isEditingActivity = !!activityToEdit;
   const isEditingForDate = !!dateForEntry;
@@ -96,7 +109,7 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
     if (!dateForEntry) return undefined;
     const serviceYear = getServiceYear(dateForEntry);
     const yearHistory = archives[serviceYear] || {};
-    const dateKey = `${dateForEntry.getFullYear()}-${String(dateForEntry.getMonth() + 1).padStart(2, '0')}-${String(dateForEntry.getDate()).padStart(2, '0')}`;
+    const dateKey = formatDateKey(dateForEntry);
     return yearHistory[dateKey];
   }, [dateForEntry, archives]);
 
@@ -109,6 +122,12 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
              actDate.getDate() === dateForEntry.getDate();
     });
   }, [dateForEntry, activities]);
+
+  const plannedBlocksForDay: PlanningBlock[] | undefined = useMemo(() => {
+    if (!dateForEntry || !planningData) return undefined;
+    const dateKey = formatDateKey(dateForEntry);
+    return planningData[dateKey];
+  }, [dateForEntry, planningData]);
 
   useEffect(() => {
     if (isOpen) {
@@ -247,7 +266,7 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
 
   const getButtonText = () => {
     if (isEditingActivity || isEditMode || isEditLdcMode || isEditingForDate) return 'Guardar Cambios';
-    if (activeTab === 'hours') return 'Guardar Horas';
+    if (activeTab === 'hours') return 'Añadir';
     if (activeTab === 'ldc') return 'Guardar Horas LDC';
     return 'Guardar Actividad';
   };
@@ -261,7 +280,7 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
   
   const isDaySick = dayEntryForDate?.status === 'sick';
 
-  const TABS_ORDER: ModalTab[] = ['hours', 'ldc', 'visit', 'study'];
+  const TABS_ORDER: ModalTab[] = ['hours', 'ldc', 'visit', 'study'].filter(tab => isPioneer || tab !== 'ldc') as ModalTab[];
   const TABS_LABELS: Record<ModalTab, string> = {
     hours: 'Horas',
     ldc: 'LDC',
@@ -292,7 +311,7 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
                         key={tab}
                         type="button"
                         onClick={() => setActiveTab(tab)}
-                        className={`flex-1 py-2 text-sm font-semibold rounded-md transition-colors ${
+                        className={`flex-1 py-2 text-sm font-semibold rounded-md ${
                         activeTab === tab
                             ? `bg-white dark:bg-slate-700 ${theme.text} shadow`
                             : 'text-slate-600 dark:text-slate-300 hover:bg-slate-300/50 dark:hover:bg-slate-700/50'
@@ -303,14 +322,14 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
                     ))}
                 </div>
             )}
-             {isEditingForDate && !isEditingActivity && (
+             {isEditingForDate && !isEditingActivity && isPioneer && (
                  <div className="flex bg-slate-200 dark:bg-slate-800 rounded-lg p-1 mb-6">
                     {['hours', 'ldc'].map((tab) => (
                     <button
                         key={tab}
                         type="button"
                         onClick={() => setActiveTab(tab as ModalTab)}
-                        className={`flex-1 py-2 text-sm font-semibold rounded-md transition-colors ${
+                        className={`flex-1 py-2 text-sm font-semibold rounded-md ${
                         activeTab === tab
                             ? `bg-white dark:bg-slate-700 ${theme.text} shadow`
                             : 'text-slate-600 dark:text-slate-300 hover:bg-slate-300/50 dark:hover:bg-slate-700/50'
@@ -327,10 +346,41 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
                 <h2 id="add-hours-title" className="text-2xl font-bold text-slate-900 dark:text-slate-100 text-center">
                   {getModalTitle()}
                 </h2>
+                 {!isEditMode && !dateForEntry && (
+                    <p className="text-center text-sm text-slate-500 dark:text-slate-400 -mt-3">Añadir Horas</p>
+                )}
 
+
+                {isEditingForDate && plannedBlocksForDay && plannedBlocksForDay.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-2 text-center">Planes del Día</h3>
+                    <div className="space-y-2 bg-slate-200/50 dark:bg-slate-800/50 p-3 rounded-lg max-h-32 overflow-y-auto">
+                      {plannedBlocksForDay.map(block => (
+                        <div key={block.id}>
+                          <p className="font-semibold text-sm text-slate-700 dark:text-slate-200">{block.title}</p>
+                          {block.activityIds.length > 0 && (
+                            <ul className="pl-4 mt-1 space-y-0.5">
+                              {block.activityIds.map(id => {
+                                const activity = activities.find(a => a.id === id);
+                                if (!activity) return null;
+                                return (
+                                  <li key={id} className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                                    {activity.type === 'study' ? <AcademicCapIcon className="w-3.5 h-3.5" /> : <ArrowUturnLeftIcon className="w-3.5 h-3.5" />}
+                                    <span>{activity.name}</span>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
                 {isEditingForDate && activitiesForDay.length > 0 && (
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-2 text-center">Actividad del Día</h3>
+                    <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-2 text-center">Actividad Registrada</h3>
                     <div className="space-y-2">
                       {activitiesForDay.map(act => (
                         <div key={act.id} className="bg-slate-200 dark:bg-slate-800 p-2 rounded-lg flex items-center">
@@ -349,7 +399,7 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
                     type="text"
                     value={hoursInput}
                     onChange={handleHoursChange}
-                    placeholder={isEditMode ? "Ej: 45:30" : "Ej: 1:30 o 2,45"}
+                    placeholder="1:30"
                     className={`w-full px-4 py-3 text-center text-2xl font-bold bg-white dark:bg-slate-800 border rounded-lg focus:ring-2 ${theme.ring} outline-none transition dark:text-white ${isHoursValid ? 'border-slate-300 dark:border-slate-600' : 'border-red-500 ring-2 ring-red-300'}`}
                     onFocus={(e) => e.target.select()}
                     autoFocus={isOpen}
@@ -357,6 +407,21 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
                   />
                 </div>
                 {!isHoursValid && <p className="text-red-600 text-sm text-center -mt-2 mb-2">Formato inválido. Usa H:MM, H.MM o solo horas.</p>}
+                
+                {(!isEditMode && !isEditingForDate) && (
+                    <div className="flex justify-center gap-2 flex-wrap">
+                        {quickAddHours.map(({ label, value }) => (
+                            <button
+                                key={label}
+                                type="button"
+                                onClick={() => onAddHours(value, selectedWeather)}
+                                className={`px-4 py-2 text-sm font-semibold rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600`}
+                            >
+                                + {label}
+                            </button>
+                        ))}
+                    </div>
+                )}
                 
                 {(!isEditMode || isEditingForDate) && (
                     <div>
@@ -389,7 +454,7 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
               </div>
             )}
 
-            {activeTab === 'ldc' && (
+            {activeTab === 'ldc' && isPioneer && (
               <div className="space-y-4">
                  <h2 id="ldc-title" className="text-2xl font-bold text-slate-900 dark:text-slate-100 text-center">
                   {getModalTitle()}
@@ -455,18 +520,18 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
                 {getButtonText()}
               </button>
               {isEditingForDate && (
-                  <button type="button" onClick={handleSickClick} className={`w-full flex items-center justify-center gap-2 px-6 py-2 rounded-lg font-semibold transition-colors ${isDaySick ? 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/50' : 'text-slate-600 dark:text-slate-300 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600'}`}>
+                  <button type="button" onClick={handleSickClick} className={`w-full flex items-center justify-center gap-2 px-6 py-2 rounded-lg font-semibold ${isDaySick ? 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/50' : 'text-slate-600 dark:text-slate-300 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600'}`}>
                       {isDaySick ? <XCircleIcon className="w-5 h-5" /> : <MedicalIcon className="w-5 h-5" />}
                       {isDaySick ? 'Desmarcar como enfermo' : 'Marcar como enfermo'}
                   </button>
               )}
-              {isEditLdcMode && onDeleteLdcHours && (
-                <button type="button" onClick={onDeleteLdcHours} className="w-full flex items-center justify-center gap-2 px-6 py-2 rounded-lg font-semibold transition-colors text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/50 hover:bg-red-200 dark:hover:bg-red-900/70">
+              {isEditLdcMode && onDeleteLdcHours && isPioneer && (
+                <button type="button" onClick={onDeleteLdcHours} className="w-full flex items-center justify-center gap-2 px-6 py-2 rounded-lg font-semibold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/50 hover:bg-red-200 dark:hover:bg-red-900/70">
                     <TrashIcon className="w-5 h-5" />
                     Eliminar Horas LDC del Mes
                 </button>
               )}
-              <button type="button" onClick={onClose} className="w-full px-6 py-2 rounded-lg text-slate-600 dark:text-slate-300 font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+              <button type="button" onClick={onClose} className="w-full px-6 py-2 rounded-lg text-slate-600 dark:text-slate-300 font-semibold hover:bg-slate-200 dark:hover:bg-slate-700">
                 Cancelar
               </button>
             </div>

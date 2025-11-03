@@ -111,6 +111,42 @@ export const THEMES: Record<ThemeColor, ThemeConfig> = {
     accentText: 'text-red-100',
     accentTextLight: 'text-red-200'
   },
+  yellow: {
+    name: 'yellow',
+    gradientFrom: 'from-yellow-400',
+    gradientTo: 'to-amber-500',
+    gradientFromColor: '#facc15',
+    gradientToColor: '#f59e0b',
+    bg: 'bg-yellow-500',
+    text: 'text-yellow-500',
+    ring: 'focus:ring-yellow-500',
+    accentText: 'text-yellow-100',
+    accentTextLight: 'text-yellow-200'
+  },
+  wine: {
+    name: 'wine',
+    gradientFrom: 'from-red-800',
+    gradientTo: 'to-rose-900',
+    gradientFromColor: '#991b1b',
+    gradientToColor: '#881337',
+    bg: 'bg-red-800',
+    text: 'text-red-800',
+    ring: 'focus:ring-red-800',
+    accentText: 'text-red-100',
+    accentTextLight: 'text-red-200'
+  },
+  bw: {
+    name: 'bw',
+    gradientFrom: 'from-slate-100',
+    gradientTo: 'to-slate-400',
+    gradientFromColor: '#f1f5f9',
+    gradientToColor: '#94a3b8',
+    bg: 'bg-slate-800',
+    text: 'text-slate-50',
+    ring: 'focus:ring-slate-400',
+    accentText: 'text-slate-100',
+    accentTextLight: 'text-slate-200'
+  },
 };
 
 export const THEME_LIST = Object.values(THEMES);

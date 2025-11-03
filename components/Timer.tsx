@@ -1,12 +1,11 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { ThemeColor } from '../types';
 import { THEMES } from '../constants';
 import { hoursToHHMM } from '../utils';
 import { PlayIcon } from './icons/PlayIcon';
 import { PauseIcon } from './icons/PauseIcon';
-import { StopIcon } from './icons/StopIcon';
-import { RefreshIcon } from './icons/RefreshIcon';
+import { CheckIcon } from './icons/CheckIcon';
+import { XIcon } from './icons/XIcon';
 
 // The built-in type might not be available in the current environment.
 interface NotificationAction {
@@ -168,31 +167,37 @@ const Timer: React.FC<TimerProps> = ({
 
   return (
     <div className="flex flex-col items-center w-full">
-      <p className="text-6xl font-mono font-bold text-slate-800 dark:text-slate-100 tracking-tighter mb-6">
+      <p className="text-4xl font-mono font-bold text-slate-800 dark:text-slate-100 tracking-tight mb-4">
         {formatTime(time)}
       </p>
-      <div className="grid grid-cols-3 gap-4 w-full max-w-xs">
-        <button
-            onClick={handleReset}
-            className={`p-3 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-full flex items-center justify-center transition-transform ${!performanceMode && 'transform hover:scale-105'}`}
-            aria-label="Reiniciar temporizador"
-        >
-            <RefreshIcon className="w-6 h-6" />
-        </button>
+      <div className="flex items-center justify-center space-x-4 w-full h-16">
+        {time > 0 && !isActive ? (
+            <button
+                onClick={handleReset}
+                className={`w-14 h-14 text-red-500 rounded-full flex items-center justify-center duration-200 animate-fadeIn bg-red-500 bg-opacity-0 hover:bg-opacity-10 dark:hover:bg-opacity-20 ${!performanceMode && 'transform hover:scale-105'}`}
+                aria-label="Reiniciar temporizador"
+            >
+                <XIcon className="w-7 h-7" />
+            </button>
+        ) : <div className="w-14 h-14" />}
+
         <button
           onClick={handleToggle}
-          className={`p-4 rounded-full flex items-center justify-center text-white shadow-lg transition-transform ${theme.bg} ${!performanceMode && 'transform hover:scale-105'}`}
+          className={`w-16 h-16 rounded-full flex items-center justify-center text-white shadow-lg transition-transform ${theme.bg} ${!performanceMode && 'transform hover:scale-105'}`}
           aria-label={isActive ? 'Pausar temporizador' : 'Iniciar temporizador'}
         >
           {isActive ? <PauseIcon className="w-8 h-8" /> : <PlayIcon className="w-8 h-8" />}
         </button>
-        <button
-            onClick={handleFinish}
-            className={`p-3 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-full flex items-center justify-center transition-transform ${!performanceMode && 'transform hover:scale-105'}`}
-            aria-label="Finalizar y agregar horas"
-        >
-            <StopIcon className="w-6 h-6" />
-        </button>
+        
+        {time > 0 ? (
+           <button
+                onClick={handleFinish}
+                className={`w-14 h-14 ${theme.text} rounded-full flex items-center justify-center duration-200 animate-fadeIn ${theme.bg} bg-opacity-0 hover:bg-opacity-10 dark:hover:bg-opacity-20 ${!performanceMode && 'transform hover:scale-105'}`}
+                aria-label="Finalizar y agregar horas"
+            >
+                <CheckIcon className="w-7 h-7" />
+            </button>
+        ) : <div className="w-14 h-14" />}
       </div>
     </div>
   );

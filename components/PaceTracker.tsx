@@ -12,6 +12,7 @@ interface PaceTrackerProps {
   isPrivacyMode: boolean;
   isGhostMode: boolean;
   previousMonthHistory?: HistoryLog;
+  isPioneer: boolean;
 }
 
 const PaceTracker: React.FC<PaceTrackerProps> = ({ 
@@ -21,7 +22,8 @@ const PaceTracker: React.FC<PaceTrackerProps> = ({
   themeColor, 
   isPrivacyMode,
   isGhostMode,
-  previousMonthHistory
+  previousMonthHistory,
+  isPioneer,
 }) => {
   const theme = THEMES[themeColor] || THEMES.blue;
 
@@ -29,7 +31,7 @@ const PaceTracker: React.FC<PaceTrackerProps> = ({
   const currentDay = currentDate.getDate();
 
   const { ghostProgressPercent, ghostDifference, ghostHoursUpToToday, isGhostDataAvailable } = useMemo(() => {
-    if (!isGhostMode || !previousMonthHistory) {
+    if (!isGhostMode || !previousMonthHistory || !isPioneer) {
         return { ghostProgressPercent: 0, ghostDifference: 0, ghostHoursUpToToday: 0, isGhostDataAvailable: false };
     }
     
@@ -71,7 +73,7 @@ const PaceTracker: React.FC<PaceTrackerProps> = ({
         ghostHoursUpToToday: cumulativeGhostHours,
         isGhostDataAvailable: true, // Data is daily, not a summary
     };
-  }, [isGhostMode, previousMonthHistory, currentHours, currentDay, currentDate, goal]);
+  }, [isGhostMode, previousMonthHistory, currentHours, currentDay, currentDate, goal, isPioneer]);
 
   if (goal <= 0) {
     return null;
@@ -86,7 +88,7 @@ const PaceTracker: React.FC<PaceTrackerProps> = ({
   let message: React.ReactNode;
   let textColor = 'text-slate-500 dark:text-slate-400';
 
-  if (isGhostMode) {
+  if (isGhostMode && isPioneer) {
       if (!isGhostDataAvailable) {
           message = "El 'Modo Fantasma' estará disponible el próximo mes.";
       } else if (ghostHoursUpToToday === 0 && currentHours > 0) {
@@ -124,7 +126,7 @@ const PaceTracker: React.FC<PaceTrackerProps> = ({
         {/* User's actual progress bar */}
         {!isPrivacyMode && (
             <div 
-                className={`h-1.5 rounded-full bg-gradient-to-r ${theme.gradientFrom} ${theme.gradientTo} transition-all duration-500`} 
+                className={`h-1.5 rounded-full bg-gradient-to-r ${theme.gradientFrom} ${theme.gradientTo} transition-[width] duration-500`} 
                 style={{ width: `${userProgressPercent}%` }}
             ></div>
         )}
@@ -145,7 +147,7 @@ const PaceTracker: React.FC<PaceTrackerProps> = ({
             ></div>
         )}
         {/* Ghost marker */}
-        {isGhostMode && !isPrivacyMode && isGhostDataAvailable && (
+        {isGhostMode && isPioneer && !isPrivacyMode && isGhostDataAvailable && (
             <div
                 className="absolute top-[-6px] transition-all duration-500"
                 style={{ left: `calc(${ghostProgressPercent}% - 8px)` }}

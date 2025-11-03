@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { HistoryLog, ThemeColor, WeatherCondition, DayEntry, ActivityItem } from '../types';
+import { HistoryLog, ThemeColor, WeatherCondition, DayEntry, ActivityItem, PlanningData } from '../types';
 import { THEMES } from '../constants';
 import CalendarGrid from './CalendarGrid';
 import { getServiceYear, getServiceYearMonths, hoursToHHMM, getCommemorationDate } from '../utils';
@@ -18,6 +18,7 @@ interface HistoryViewProps {
   isPrivacyMode: boolean;
   onDayClick: (date: Date) => void;
   activities: ActivityItem[];
+  planningData: PlanningData;
 }
 
 const Stat: React.FC<{ Icon: React.FC<any>, count: number | string, label: string, colorClass: string }> = ({ Icon, count, label, colorClass }) => (
@@ -29,7 +30,7 @@ const Stat: React.FC<{ Icon: React.FC<any>, count: number | string, label: strin
 );
 
 
-const HistoryView: React.FC<HistoryViewProps> = ({ archives, currentServiceYear, themeColor, isPrivacyMode, onDayClick, activities }) => {
+const HistoryView: React.FC<HistoryViewProps> = ({ archives, currentServiceYear, themeColor, isPrivacyMode, onDayClick, activities, planningData }) => {
   const theme = THEMES[themeColor] || THEMES.blue;
   const [selectedYear, setSelectedYear] = useState(currentServiceYear);
 
@@ -55,9 +56,16 @@ const HistoryView: React.FC<HistoryViewProps> = ({ archives, currentServiceYear,
 
   const historyForSelectedYear = archives[selectedYear] || {};
   
-  const isSummaryMonth = useMemo(() => {
-    const monthKey = `${selectedMonthDate.getFullYear()}-${String(selectedMonthDate.getMonth() + 1).padStart(2, '0')}-SUMMARY`;
-    return historyForSelectedYear[monthKey]?.isSummary === true;
+  const { isSummaryMonth, carryoverHours } = useMemo(() => {
+    const month = selectedMonthDate.getMonth() + 1;
+    const year = selectedMonthDate.getFullYear();
+    const summaryKey = `${year}-${String(month).padStart(2, '0')}-SUMMARY`;
+    const carryoverKey = `${year}-${String(month).padStart(2, '0')}-CARRYOVER`;
+    
+    return {
+      isSummaryMonth: historyForSelectedYear[summaryKey]?.isSummary === true,
+      carryoverHours: historyForSelectedYear[carryoverKey]?.hours || 0,
+    }
   }, [historyForSelectedYear, selectedMonthDate]);
   
   const { weatherCounts, totalLdcHours } = useMemo(() => {
@@ -70,6 +78,8 @@ const HistoryView: React.FC<HistoryViewProps> = ({ archives, currentServiceYear,
     
     Object.keys(historyForSelectedYear).forEach(dateKey => {
         const entry = historyForSelectedYear[dateKey];
+        if (dateKey.includes('CARRYOVER') || dateKey.includes('SUMMARY')) return;
+
         const entryDate = new Date(dateKey);
         if (entryDate.getFullYear() === year && entryDate.getMonth() === month) {
             if (typeof entry === 'object' && entry) {
@@ -138,6 +148,13 @@ const HistoryView: React.FC<HistoryViewProps> = ({ archives, currentServiceYear,
             </div>
         )}
 
+        {carryoverHours > 0 && (
+            <div className="mb-4 text-center text-sm bg-blue-50 dark:bg-blue-900/40 p-3 rounded-lg flex items-center justify-center gap-2">
+                <InformationCircleIcon className="w-5 h-5 text-blue-500" />
+                <span>Este mes incluye <strong>{hoursToHHMM(carryoverHours)} horas</strong> registradas antes de usar la app.</span>
+            </div>
+        )}
+
         <CalendarGrid 
             selectedMonth={selectedMonthDate}
             historyLog={historyForSelectedYear}
@@ -147,6 +164,8 @@ const HistoryView: React.FC<HistoryViewProps> = ({ archives, currentServiceYear,
             activities={activities}
             isSummaryMonth={isSummaryMonth}
             commemorationDate={commemorationDate}
+            carryoverHours={carryoverHours}
+            planningData={planningData}
         />
       </div>
 

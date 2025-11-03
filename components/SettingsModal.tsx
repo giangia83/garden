@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { ThemeColor, Shape, ThemeMode } from '../types';
 import { THEME_LIST, THEMES } from '../constants';
@@ -72,11 +71,20 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
   
+  const handleColorSelect = (selectedColor: ThemeColor) => {
+    setColor(selectedColor);
+    if (selectedColor === 'bw') {
+      setMode('black');
+    }
+  };
+
   const shapeOptions: { name: Shape; Icon: React.FC<React.SVGProps<SVGSVGElement>> }[] = [
     { name: 'flower', Icon: FlowerIcon },
     { name: 'circle', Icon: CircleIcon },
     { name: 'heart', Icon: HeartIcon },
   ];
+
+  const isBwTheme = color === 'bw';
 
   return (
     <div
@@ -113,7 +121,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Ej: Precursor"
-                  className={`w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 ${theme.ring} outline-none transition`}
+                  className={`w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 ${theme.ring} outline-none`}
                 />
               </div>
             </div>
@@ -129,7 +137,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   value={goal}
                   onChange={(e) => setGoal(e.target.value)}
                   placeholder="Ej: 50"
-                  className={`w-full px-4 py-2 bg-gray-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 ${theme.ring} outline-none transition`}
+                  className={`w-full px-4 py-2 bg-gray-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 ${theme.ring} outline-none`}
                 />
               </div>
               <div>
@@ -143,7 +151,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       setDate(e.target.value)
                     }
                   }}
-                  className={`w-full px-4 py-2 bg-gray-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 ${theme.ring} outline-none transition`}
+                  className={`w-full px-4 py-2 bg-gray-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 ${theme.ring} outline-none`}
                 />
               </div>
             </div>
@@ -151,12 +159,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
              {/* Theme Mode */}
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Tema</label>
-              <div className="flex gap-2 p-1 bg-gray-100 dark:bg-slate-700 rounded-lg">
+              <div className={`flex gap-2 p-1 bg-gray-100 dark:bg-slate-700 rounded-lg ${isBwTheme ? 'opacity-50' : ''}`}>
                   <button
                     onClick={() => setMode('light')}
-                    className={`flex-1 flex items-center justify-center space-x-2 py-2 rounded-md transition-colors text-sm font-semibold ${
+                    disabled={isBwTheme}
+                    className={`flex-1 flex items-center justify-center space-x-2 py-2 rounded-md text-sm font-semibold ${
                       mode === 'light' ? `${theme.bg} text-white shadow` : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600/50'
-                    }`}
+                    } ${isBwTheme ? 'cursor-not-allowed' : ''}`}
                     aria-pressed={mode === 'light'}
                   >
                     <SunIcon className="w-5 h-5" />
@@ -164,9 +173,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   </button>
                   <button
                     onClick={() => setMode('dark')}
-                    className={`flex-1 flex items-center justify-center space-x-2 py-2 rounded-md transition-colors text-sm font-semibold ${
+                    disabled={isBwTheme}
+                    className={`flex-1 flex items-center justify-center space-x-2 py-2 rounded-md text-sm font-semibold ${
                       mode === 'dark' ? `${theme.bg} text-white shadow` : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600/50'
-                    }`}
+                    } ${isBwTheme ? 'cursor-not-allowed' : ''}`}
                     aria-pressed={mode === 'dark'}
                   >
                     <MoonIcon className="w-5 h-5" />
@@ -174,15 +184,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   </button>
                   <button
                     onClick={() => setMode('black')}
-                    className={`flex-1 flex items-center justify-center space-x-2 py-2 rounded-md transition-colors text-sm font-semibold ${
+                    disabled={isBwTheme}
+                    className={`flex-1 flex items-center justify-center space-x-2 py-2 rounded-md text-sm font-semibold ${
                       mode === 'black' ? `${theme.bg} text-white shadow` : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600/50'
-                    }`}
+                    } ${isBwTheme ? 'cursor-not-allowed' : ''}`}
                     aria-pressed={mode === 'black'}
                   >
                     <SolidCircleIcon className="w-5 h-5" />
                     <span>Negro</span>
                   </button>
               </div>
+               {isBwTheme && <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-1">El tema Blanco y Negro requiere el modo Negro.</p>}
             </div>
 
 
@@ -194,7 +206,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   <button
                     key={shapeName}
                     onClick={() => setShape(shapeName)}
-                    className={`flex-1 p-3 border-2 rounded-lg flex items-center justify-center transition-all ${
+                    className={`flex-1 p-3 border-2 rounded-lg flex items-center justify-center ${
                       shape === shapeName ? `${THEMES[color].text} border-current bg-blue-50/50 dark:bg-slate-700/50` : 'border-slate-300 dark:border-slate-600 bg-gray-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600'
                     }`}
                     aria-pressed={shape === shapeName}
@@ -213,13 +225,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 {THEME_LIST.map((themeOption) => (
                   <button
                     key={themeOption.name}
-                    onClick={() => setColor(themeOption.name)}
-                    className={`w-full h-12 rounded-lg flex items-center justify-center bg-gradient-to-br ${themeOption.gradientFrom} ${themeOption.gradientTo} transition-transform transform hover:scale-110`}
+                    onClick={() => handleColorSelect(themeOption.name)}
+                    className={`w-full h-12 rounded-lg flex items-center justify-center bg-gradient-to-br ${themeOption.gradientFrom} ${themeOption.gradientTo} ${!performanceMode && 'transition-transform transform hover:scale-110'}`}
                     aria-label={`Seleccionar color ${themeOption.name}`}
                     aria-pressed={color === themeOption.name}
                   >
                     {color === themeOption.name && (
-                      <CheckIcon className="w-6 h-6 text-white" />
+                      <CheckIcon className={`w-6 h-6 ${themeOption.name === 'bw' ? 'text-slate-900' : 'text-white'}`} />
                     )}
                   </button>
                 ))}
@@ -231,7 +243,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         <footer className="flex-shrink-0 p-4 border-t border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50">
           <button
             onClick={handleSave}
-            className={`w-full px-6 py-3 rounded-lg ${theme.bg} text-white font-bold text-lg shadow-md transition-transform ${!performanceMode && 'transform hover:scale-105'}`}
+            className={`w-full px-6 py-3 rounded-lg ${theme.bg} ${color === 'bw' ? 'text-slate-900' : 'text-white'} font-bold text-lg shadow-md ${!performanceMode && 'transition-transform transform hover:scale-105'}`}
           >
             Guardar
           </button>

@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { ActivityItem, ThemeColor, GroupArrangement } from '../types';
 import ActivityCard from './ActivityCard';
@@ -19,6 +20,7 @@ interface ActivityViewProps {
   isOnline: boolean;
   performanceMode: boolean;
   currentDate: Date;
+  isPrivacyMode: boolean;
 }
 
 type ActivityTab = 'groups' | 'visits' | 'studies';
@@ -33,10 +35,12 @@ const ActivityView: React.FC<ActivityViewProps> = ({
   isOnline,
   performanceMode,
   currentDate,
+  isPrivacyMode,
 }) => {
   const [activeTab, setActiveTab] = useState<ActivityTab>('groups');
   const [isImportModalOpen, setImportModalOpen] = useState(false);
   const theme = THEMES[themeColor] || THEMES.blue;
+  const privacyBlur = isPrivacyMode ? 'blur-md select-none pointer-events-none' : '';
 
   const monthlySummary = useMemo(() => {
     const now = currentDate;
@@ -154,7 +158,7 @@ const ActivityView: React.FC<ActivityViewProps> = ({
             <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 py-2 text-sm font-semibold rounded-md transition-colors ${
+                className={`flex-1 py-2 text-sm font-semibold rounded-md ${
                 activeTab === tab.id
                     ? `bg-white dark:bg-slate-700 ${theme.text} dark:${theme.accentText} shadow`
                     : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -166,13 +170,13 @@ const ActivityView: React.FC<ActivityViewProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className={`grid grid-cols-2 gap-4 mb-6 ${privacyBlur}`}>
         <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl flex items-center space-x-3 shadow-sm border border-slate-200/50 dark:border-slate-700/50">
           <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${theme.bg} bg-opacity-10`}>
             <ArrowUturnLeftIcon className={`w-6 h-6 ${theme.text}`} />
           </div>
           <div>
-            <p className="text-3xl font-bold text-slate-800 dark:text-slate-100">{monthlySummary.visits}</p>
+            <p className="text-3xl font-bold text-slate-800 dark:text-slate-100">{isPrivacyMode ? '**' : monthlySummary.visits}</p>
             <p className="text-sm text-slate-500 dark:text-slate-400">Revisitas este mes</p>
           </div>
         </div>
@@ -181,13 +185,18 @@ const ActivityView: React.FC<ActivityViewProps> = ({
             <AcademicCapIcon className={`w-6 h-6 ${theme.text}`} />
           </div>
           <div>
-            <p className="text-3xl font-bold text-slate-800 dark:text-slate-100">{monthlySummary.studies}</p>
+            <p className="text-3xl font-bold text-slate-800 dark:text-slate-100">{isPrivacyMode ? '**' : monthlySummary.studies}</p>
             <p className="text-sm text-slate-500 dark:text-slate-400">Estudios este mes</p>
           </div>
         </div>
       </div>
       
-      {renderContent()}
+      {isPrivacyMode && activeTab !== 'groups' ? (
+        <div className="text-center py-16 px-4">
+          <p className="text-lg font-semibold text-slate-700 dark:text-slate-200">Modo de Privacidad Activado</p>
+          <p className="text-slate-500 dark:text-slate-400 mt-2">Desactiva el modo de privacidad para ver la actividad detallada.</p>
+        </div>
+      ) : renderContent()}
 
       <ImportArrangementModal
         isOpen={isImportModalOpen}

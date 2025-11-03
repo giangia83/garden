@@ -26,6 +26,7 @@
             fadeInUp: 'fadeInUp 0.5s ease-in-out',
             twinkle: 'twinkle 2s infinite ease-in-out',
             sway: 'sway 5s infinite ease-in-out alternate',
+            boingIn: 'boingIn 0.5s ease-out forwards',
           },
           keyframes: {
             fadeIn: {
@@ -43,6 +44,12 @@
             sway: {
                 '0%': { transform: 'rotate(-2deg) translateX(-1px)' },
                 '100%': { transform: 'rotate(2deg) translateX(1px)' },
+            },
+            boingIn: {
+                '0%': { opacity: '0', transform: 'scale(0.5)' },
+                '50%': { opacity: '1', transform: 'scale(1.05)' },
+                '70%': { transform: 'scale(0.95)' },
+                '100%': { opacity: '1', transform: 'scale(1)' },
             },
           }
         }

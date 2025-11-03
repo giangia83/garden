@@ -1,16 +1,18 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import ServiceTracker from './components/ServiceTracker';
 import HistoryView from './components/HistoryView';
 import ActivityView from './components/ActivityView';
+import PlanningView from './components/PlanningView';
 import GreetingCard from './components/GreetingCard';
 import AddHoursModal from './components/AddHoursModal';
 import SettingsModal from './components/SettingsModal';
 import HelpModal from './components/HelpModal';
 import OfflineToast from './components/OfflineToast';
 import Welcome from './components/Welcome';
-import StreakRestoreToast from './components/StreakRestoreToast';
+import StreakTutorialModal from './components/StreakTutorialModal';
 import StreakModal from './components/StreakModal';
 import InteractiveTutorial from './components/InteractiveTutorial';
 import TutorialConfirmationModal from './components/TutorialConfirmationModal';
@@ -18,9 +20,92 @@ import GoalReachedModal from './components/GoalReachedModal';
 import Sidebar from './components/Sidebar';
 import EndOfYearModal from './components/EndOfYearModal';
 import ConfirmationModal from './components/ConfirmationModal';
+import PlanningModal from './components/PlanningModal';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
-import { ThemeColor, HistoryLog, Shape, ActivityItem, ActivityType, ThemeMode, GroupArrangement, SetupData, TutorialsSeen, TutorialStep, AppState, WeatherCondition, DayStatus, DayEntry } from './types';
-import { isSameDay, daysBetween, isWeekend, getServiceYear, getServiceYearMonths } from './utils';
+import { ThemeColor, HistoryLog, Shape, ActivityItem, ActivityType, ThemeMode, GroupArrangement, SetupData, TutorialsSeen, TutorialStep, AppState, WeatherCondition, DayStatus, DayEntry, PlanningData, PlanningBlock, UserRole } from './types';
+import { isSameDay, daysBetween, isWeekend, getServiceYear, getServiceYearMonths, hoursToHHMM, getCommemorationDate, formatDateKey } from './utils';
+import ShareToast from './components/ShareToast';
+import ShareReportModal from './components/ShareReportModal';
+import { THEMES } from './constants';
+
+const SolidStarIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg 
+      xmlns="http://www.w3.org/2000/svg" 
+      viewBox="0 0 24 24" 
+      fill="currentColor" 
+      {...props}
+    >
+      <path 
+        fillRule="evenodd" 
+        d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.007 5.404.433c1.164.093 1.636 1.545.749 2.386l-4.05 3.528 1.176 5.27c.286 1.282-1.034 2.288-2.14 1.623l-4.65-2.844-4.65 2.844c-1.106.665-2.426-.34-2.14-1.623l1.176-5.27-4.05-3.528c-.887-.84-.415-2.293.749-2.386l5.404-.433 2.082-5.007z" 
+        clipRule="evenodd" 
+      />
+    </svg>
+);
+
+interface CommemorationModalProps {
+  isOpen: boolean;
+  onConfirm: () => void;
+  onDecline: () => void;
+  themeColor: ThemeColor;
+  performanceMode: boolean;
+}
+
+const CommemorationModal: React.FC<CommemorationModalProps> = ({ isOpen, onConfirm, onDecline, themeColor, performanceMode }) => {
+  const theme = THEMES[themeColor] || THEMES.blue;
+  const [hasBeenOpened, setHasBeenOpened] = React.useState(false);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setHasBeenOpened(true);
+    }
+  }, [isOpen]);
+
+  if (!hasBeenOpened) return null;
+
+  return (
+    <div
+      className={`fixed inset-0 z-50 transition-colors duration-300 ${isOpen ? 'bg-black/60' : 'bg-transparent pointer-events-none'}`}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="commemoration-title"
+      onClick={onDecline}
+    >
+      <div className={`fixed inset-0 flex items-center justify-center p-4 transition-opacity ${performanceMode ? 'duration-0' : 'duration-300'} ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+        <div
+          className={`bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm p-6 text-center transform transition-all ${performanceMode ? 'duration-0' : 'duration-300'}`}
+          style={{ transform: isOpen ? 'scale(1)' : 'scale(0.95)' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center bg-gradient-to-br from-red-800 to-rose-900 mb-4">
+            <SolidStarIcon className="w-9 h-9 text-yellow-300" />
+          </div>
+          <h2 id="commemoration-title" className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+            Mes de la Conmemoración
+          </h2>
+          <p className="text-slate-600 dark:text-slate-300 mb-6">
+            Ha comenzado un mes muy especial. ¿Te gustaría cambiar el color del tema a vinotinto para la ocasión?
+          </p>
+          <div className="flex flex-col space-y-3">
+             <button 
+                onClick={onConfirm} 
+                className="w-full px-6 py-3 rounded-lg bg-red-800 hover:bg-red-700 text-white font-bold text-lg shadow-lg transition-transform"
+            >
+                Sí, cambiar color
+            </button>
+            <button 
+              onClick={onDecline} 
+              className="w-full px-6 py-2 rounded-lg text-slate-600 dark:text-slate-300 font-semibold hover:bg-slate-200 dark:hover:bg-slate-700"
+            >
+              No, gracias
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 const APP_STORAGE_key = 'garden-service-tracker';
 const WELCOME_SHOWN_KEY = 'garden-welcome-shown';
@@ -30,11 +115,12 @@ const SETTINGS_KEY = 'garden-settings';
 const PRIVACY_MODE_KEY = 'garden-privacy-mode';
 const REMINDER_LAST_SENT_KEY = 'garden-reminder-last-sent';
 
-type AppView = 'tracker' | 'activity' | 'history';
+type AppView = 'tracker' | 'activity' | 'history' | 'planning';
 
 const TUTORIALS: Record<AppView, TutorialStep[]> = {
   tracker: [
     { target: '#progress-display-container', title: 'Tu Progreso Mensual', content: 'Este es el corazón de tu informe. Muestra tu avance hacia la meta. ¡Tócalo para editar tu total de horas!', position: 'bottom' },
+    { target: '#header-title', title: 'Modo Estadístico', content: 'Toca el título "Garden" para cambiar a una vista de estadísticas detalladas, con proyecciones anuales y más datos sobre tu servicio.', position: 'bottom' },
     { target: '#ghost-mode-toggle', title: 'Modo Fantasma', content: 'Compite contra ti mismo. El fantasma marca las horas que llevabas en la misma fecha del mes anterior. Ten en cuenta que esta función estará disponible después de que completes tu primer mes de registro en la app.', position: 'bottom' },
     { target: '#timer-section', title: 'Temporizador Integrado', content: 'Usa el temporizador para registrar tu servicio en tiempo real. ¡No perderás ni un minuto!', position: 'top' },
     { target: '#streak-indicator', title: 'Tu Racha Diaria', content: '¡Mantén la motivación! Toca aquí para ver los detalles de tu racha y configurar tu día de descanso.', position: 'bottom' },
@@ -49,6 +135,10 @@ const TUTORIALS: Record<AppView, TutorialStep[]> = {
     { target: '#month-navigator', title: 'Navega por Mes', content: 'Usa las flechas para moverte entre los meses del año de servicio.', position: 'bottom' },
     { target: '#calendar-grid', title: 'Calendario Editable', content: 'Cada día muestra tus horas registradas. ¡Toca cualquier día para añadir o editar tus horas!', position: 'top' },
   ],
+  planning: [
+    { target: '#planning-week-view', title: 'Planificación Semanal', content: 'Visualiza tu semana de un vistazo. Cada tarjeta representa un día para organizar tu servicio.', position: 'top' },
+    { target: '#add-plan-block-button', title: 'Bloques de Servicio', content: 'Toca el botón "+" para añadir un bloque de servicio. Dentro, podrás darle un título, un horario y vincular tus revisitas y estudios para tener un plan claro.', position: 'bottom' },
+  ]
 };
 
 const getViewFromHash = (hash: string): AppView => {
@@ -57,6 +147,8 @@ const getViewFromHash = (hash: string): AppView => {
             return 'activity';
         case '#/history':
             return 'history';
+        case '#/planning':
+            return 'planning';
         case '#/':
         case '':
         default:
@@ -119,6 +211,12 @@ const getInitialState = (): AppState | null => {
     if (!parsed.activities) parsed.activities = [];
     if (!parsed.groupArrangements) parsed.groupArrangements = [];
     if (!parsed.currentLdcHours) parsed.currentLdcHours = 0;
+    if (!parsed.planningData) parsed.planningData = {};
+    if (!parsed.userRole) parsed.userRole = 'reg_pioneer';
+
+    // Remove legacy streak restore fields
+    delete parsed.streakRestores;
+    delete parsed.lastRestoreMonth;
 
     return parsed;
   } catch (e) {
@@ -173,6 +271,7 @@ const App: React.FC = () => {
   const [currentLdcHours, setCurrentLdcHours] = useState(initialState?.currentLdcHours ?? 0);
   const [userName, setUserName] = useState(initialState?.userName ?? 'Precursor');
   const [goal, setGoal] = useState(initialState?.goal ?? 50);
+  const [userRole, setUserRole] = useState<UserRole>(initialState?.userRole ?? 'reg_pioneer');
   const [currentDate, setCurrentDate] = useState(initialState?.currentDate ? new Date(initialState.currentDate) : new Date());
   const [progressShape, setProgressShape] = useState<Shape>(validatedShape);
   const [themeColor, setThemeColor] = useState<ThemeColor>(initialState?.themeColor ?? 'blue');
@@ -181,14 +280,12 @@ const App: React.FC = () => {
   const [currentServiceYear, setCurrentServiceYear] = useState(initialState?.currentServiceYear ?? initialServiceYear);
   const [activities, setActivities] = useState<ActivityItem[]>(initialState?.activities ?? []);
   const [groupArrangements, setGroupArrangements] = useState<GroupArrangement[]>(initialState?.groupArrangements ?? []);
-  
+  const [planningData, setPlanningData] = useState<PlanningData>(initialState?.planningData ?? {});
+
   // Streak State
   const [streak, setStreak] = useState(initialState?.streak ?? 0);
   const [lastLogDate, setLastLogDate] = useState<Date | null>(initialState?.lastLogDate ? new Date(initialState.lastLogDate) : null);
-  const [streakRestores, setStreakRestores] = useState(initialState?.streakRestores ?? 3);
-  const [lastRestoreMonth, setLastRestoreMonth] = useState(initialState?.lastRestoreMonth ?? new Date().getMonth());
   const [protectedDay, setProtectedDay] = useState<number | null>(initialState?.protectedDay ?? null);
-  const [showStreakRestoreToast, setShowStreakRestoreToast] = useState(false);
   
   const [activeView, setActiveView] = useState<AppView>(getViewFromHash(window.location.hash));
   const [isAddHoursModalOpen, setAddHoursModalOpen] = useState(false);
@@ -200,6 +297,11 @@ const App: React.FC = () => {
   const [isEndOfYearModalOpen, setEndOfYearModalOpen] = useState(false);
   const [isImportConfirmModalOpen, setImportConfirmModalOpen] = useState(false);
   const [importedState, setImportedState] = useState<AppState | null>(null);
+  const [isCommemorationModalOpen, setIsCommemorationModalOpen] = useState(false);
+  
+  const [isPlanningModalOpen, setIsPlanningModalOpen] = useState(false);
+  const [dateForPlanning, setDateForPlanning] = useState<Date | null>(null);
+  const [planningBlockToEdit, setPlanningBlockToEdit] = useState<PlanningBlock | null>(null);
 
   const [activityToEdit, setActivityToEdit] = useState<ActivityItem | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -214,6 +316,7 @@ const App: React.FC = () => {
 
   const [isPrivacyMode, setIsPrivacyMode] = useState(getInitialPrivacyMode());
   const [isGhostMode, setIsGhostMode] = useState(false);
+  const [isStatsMode, setIsStatsMode] = useState(false);
 
   const [showWelcome, setShowWelcome] = useState(!localStorage.getItem(WELCOME_SHOWN_KEY));
 
@@ -227,6 +330,9 @@ const App: React.FC = () => {
   });
   const [activeTutorial, setActiveTutorial] = useState<TutorialStep[] | null>(null);
   const [tutorialToConfirm, setTutorialToConfirm] = useState<AppView | null>(null);
+  const [isStreakTutorialModalOpen, setStreakTutorialModalOpen] = useState(false);
+  const [showShareToast, setShowShareToast] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -234,10 +340,23 @@ const App: React.FC = () => {
   useEffect(() => {
     const today = new Date();
     const serviceYearOfToday = getServiceYear(today);
+
+    // Check for new service year
     if (serviceYearOfToday !== currentServiceYear) {
       setEndOfYearModalOpen(true);
     }
-  }, []);
+    
+    // Check for Commemoration month
+    const commemorationDate = getCommemorationDate(serviceYearOfToday);
+    if (commemorationDate && today.getMonth() === commemorationDate.getUTCMonth() && today.getFullYear() === commemorationDate.getUTCFullYear()) {
+      const alertShownKey = `garden-commemoration-alert-shown-${serviceYearOfToday}`;
+      const hasBeenShown = localStorage.getItem(alertShownKey);
+      
+      if (!hasBeenShown) {
+        setTimeout(() => setIsCommemorationModalOpen(true), 1500);
+      }
+    }
+  }, [currentServiceYear]);
 
   useEffect(() => {
     const settings = { performanceMode, remindersEnabled, reminderTime };
@@ -326,6 +445,14 @@ const App: React.FC = () => {
     setTutorialsSeen(newTutorialsSeen);
     localStorage.setItem(TUTORIALS_SEEN_KEY, JSON.stringify(newTutorialsSeen));
     setActiveTutorial(null);
+
+    if (view === 'tracker') {
+      const hasSeenStreakTutorial = localStorage.getItem('garden-streak-tutorial-seen');
+      if (!hasSeenStreakTutorial) {
+        setStreakTutorialModalOpen(true);
+        localStorage.setItem('garden-streak-tutorial-seen', 'true');
+      }
+    }
   };
   
   const handleStartTutorial = (view: AppView) => {
@@ -337,7 +464,7 @@ const App: React.FC = () => {
   };
   
   const handleSkipAllTutorials = () => {
-    const allSeen: TutorialsSeen = { tracker: true, activity: true, history: true };
+    const allSeen: TutorialsSeen = { tracker: true, activity: true, history: true, planning: true };
     setTutorialsSeen(allSeen);
     localStorage.setItem(TUTORIALS_SEEN_KEY, JSON.stringify(allSeen));
     localStorage.setItem(TUTORIAL_AGREEMENT_KEY, 'false');
@@ -397,6 +524,7 @@ const App: React.FC = () => {
       currentLdcHours,
       userName,
       goal,
+      userRole,
       currentDate: currentDate.toISOString(),
       progressShape,
       themeColor,
@@ -407,32 +535,19 @@ const App: React.FC = () => {
       groupArrangements,
       streak,
       lastLogDate: lastLogDate ? lastLogDate.toISOString() : null,
-      streakRestores,
-      lastRestoreMonth,
       protectedDay,
+      planningData,
     };
     localStorage.setItem(APP_STORAGE_key, JSON.stringify(stateToSave));
-  }, [currentHours, currentLdcHours, userName, goal, currentDate, progressShape, themeColor, themeMode, archives, currentServiceYear, activities, groupArrangements, streak, lastLogDate, streakRestores, lastRestoreMonth, protectedDay]);
+  }, [currentHours, currentLdcHours, userName, goal, userRole, currentDate, progressShape, themeColor, themeMode, archives, currentServiceYear, activities, groupArrangements, streak, lastLogDate, protectedDay, planningData]);
   
   useEffect(() => {
     localStorage.setItem(PRIVACY_MODE_KEY, String(isPrivacyMode));
   }, [isPrivacyMode]);
 
-  const formatDateKey = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-  
   const updateStreak = () => {
     const today = new Date();
     
-    if (today.getMonth() !== lastRestoreMonth) {
-        setStreakRestores(3);
-        setLastRestoreMonth(today.getMonth());
-    }
-
     if (!lastLogDate) {
         setStreak(1);
         setLastLogDate(today);
@@ -458,10 +573,6 @@ const App: React.FC = () => {
 
         if (missedDaysAreProtected) {
             setStreak(s => s + 1);
-        } else if (streakRestores > 0) {
-            setStreakRestores(r => r - 1);
-            setStreak(s => s + 1);
-            setShowStreakRestoreToast(true);
         } else {
             setStreak(1);
         }
@@ -471,25 +582,51 @@ const App: React.FC = () => {
 
   const handleAddHours = (hoursToAdd: number, weather?: WeatherCondition) => {
     if (hoursToAdd <= 0) return;
-    const dateKey = formatDateKey(new Date());
+
+    const today = new Date();
+    const serviceYear = getServiceYear(today);
+    const dateKey = formatDateKey(today);
+    
+    let total = 0;
     setArchives(prev => {
         const newArchives = { ...prev };
-        const yearHistory = { ...(newArchives[currentServiceYear] || {}) };
+        const yearHistory = { ...(newArchives[serviceYear] || {}) };
+        
         const oldEntry = yearHistory[dateKey] || { hours: 0 };
         yearHistory[dateKey] = {
             ...oldEntry,
             hours: oldEntry.hours + hoursToAdd,
-            weather: weather || oldEntry.weather, // Keep old weather if new one isn't provided
+            weather: weather || oldEntry.weather,
         };
-        newArchives[currentServiceYear] = yearHistory;
+        newArchives[serviceYear] = yearHistory;
+        
+        // Recalculate total for current month
+        total = 0; // reset total
+        const currentMonthHistory = newArchives[serviceYear] || {};
+        for (const key in currentMonthHistory) {
+            if (!key.includes('SUMMARY') && !isNaN(new Date(key).getTime())) {
+                const entryDate = new Date(key);
+                if (entryDate.getFullYear() === today.getFullYear() && entryDate.getMonth() === today.getMonth()) {
+                    total += currentMonthHistory[key].hours || 0;
+                }
+            }
+        }
+        
+        // Add carryover if it exists
+        const carryoverKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-CARRYOVER`;
+        if(currentMonthHistory[carryoverKey]) {
+            total += currentMonthHistory[carryoverKey].hours || 0;
+        }
+
+        const wasGoalReached = currentHours >= goal;
+        if (!wasGoalReached && total >= goal) {
+            setGoalReachedModalOpen(true);
+        }
+        setCurrentHours(total);
+
         return newArchives;
     });
     
-    const wasGoalReached = currentHours >= goal;
-    const newHours = currentHours + hoursToAdd;
-    if (!wasGoalReached && newHours >= goal) setGoalReachedModalOpen(true);
-
-    setCurrentHours(newHours);
     updateStreak();
     setAddHoursModalOpen(false);
   };
@@ -614,12 +751,21 @@ const App: React.FC = () => {
       if (date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth()) {
         const currentMonthHistory = newArchives[getServiceYear(today)];
         let total = 0;
+        
         for (const key in currentMonthHistory) {
-          const entryDate = new Date(key);
-          if (entryDate.getFullYear() === today.getFullYear() && entryDate.getMonth() === today.getMonth()) {
-            total += currentMonthHistory[key].hours || 0;
+          if (!key.includes('SUMMARY') && !isNaN(new Date(key).getTime())) {
+            const entryDate = new Date(key);
+            if(entryDate.getFullYear() === today.getFullYear() && entryDate.getMonth() === today.getMonth()){
+              total += currentMonthHistory[key].hours || 0;
+            }
           }
         }
+        
+        const carryoverKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-CARRYOVER`;
+        if(currentMonthHistory[carryoverKey]) {
+            total += currentMonthHistory[carryoverKey].hours || 0;
+        }
+
         setCurrentHours(total);
       }
 
@@ -663,9 +809,11 @@ const App: React.FC = () => {
         const currentMonthHistory = newArchives[getServiceYear(today)];
         let total = 0;
         for (const key in currentMonthHistory) {
-          const entryDate = new Date(key);
-          if (entryDate.getFullYear() === today.getFullYear() && entryDate.getMonth() === today.getMonth()) {
-            total += currentMonthHistory[key].ldcHours || 0;
+           if (!key.includes('SUMMARY') && !key.includes('CARRYOVER') && !isNaN(new Date(key).getTime())) {
+            const entryDate = new Date(key);
+            if (entryDate.getFullYear() === today.getFullYear() && entryDate.getMonth() === today.getMonth()) {
+              total += currentMonthHistory[key].ldcHours || 0;
+            }
           }
         }
         setCurrentLdcHours(total);
@@ -699,7 +847,7 @@ const App: React.FC = () => {
         if (newEntry.hours > 0 || newEntry.weather || newEntry.status || newEntry.isCampaign || (newEntry.ldcHours && newEntry.ldcHours > 0)) {
             yearHistory[dateKey] = newEntry;
         } else {
-            delete yearHistory[dateKey];
+            delete newEntry.status;
         }
         
         newArchives[serviceYear] = yearHistory;
@@ -710,13 +858,22 @@ const App: React.FC = () => {
             const currentMonthHistory = newArchives[getServiceYear(today)];
             let totalService = 0;
             let totalLdc = 0;
+            
             for (const key in currentMonthHistory) {
-              const entryDate = new Date(key);
-              if (entryDate.getFullYear() === today.getFullYear() && entryDate.getMonth() === today.getMonth()) {
-                totalService += currentMonthHistory[key].hours || 0;
-                totalLdc += currentMonthHistory[key].ldcHours || 0;
+              if (!key.includes('SUMMARY') && !isNaN(new Date(key).getTime())) {
+                const entryDate = new Date(key);
+                if (entryDate.getFullYear() === today.getFullYear() && entryDate.getMonth() === today.getMonth()) {
+                  totalService += currentMonthHistory[key].hours || 0;
+                  totalLdc += currentMonthHistory[key].ldcHours || 0;
+                }
               }
             }
+
+            const carryoverKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-CARRYOVER`;
+            if(currentMonthHistory[carryoverKey]) {
+                totalService += currentMonthHistory[carryoverKey].hours || 0;
+            }
+
             setCurrentHours(totalService);
             setCurrentLdcHours(totalLdc);
         }
@@ -732,6 +889,9 @@ const App: React.FC = () => {
     setDateToEdit(null);
     setIsEditTotalHoursMode(false);
     setIsEditLdcHoursMode(false);
+    setIsPlanningModalOpen(false);
+    setDateForPlanning(null);
+    setPlanningBlockToEdit(null);
   };
 
   const handleSaveActivity = (data: Omit<ActivityItem, 'id' | 'date'> & { recurring?: boolean }) => {
@@ -764,6 +924,49 @@ const App: React.FC = () => {
     setIsEditTotalHoursMode(false);
     setAddHoursModalOpen(true);
   };
+  
+  const handleOpenPlanningModal = (date: Date, block: PlanningBlock | null) => {
+      setDateForPlanning(date);
+      setPlanningBlockToEdit(block);
+      setIsPlanningModalOpen(true);
+  };
+
+  const handleSavePlanningBlock = (date: Date, blockData: Omit<PlanningBlock, 'id'>) => {
+    const dateKey = formatDateKey(date);
+    setPlanningData(prev => {
+        const newPlanningData = { ...prev };
+        const dayBlocks = newPlanningData[dateKey] ? [...newPlanningData[dateKey]] : [];
+        if (planningBlockToEdit) {
+            // Editing existing block
+            const blockIndex = dayBlocks.findIndex(b => b.id === planningBlockToEdit.id);
+            if (blockIndex > -1) {
+                dayBlocks[blockIndex] = { ...planningBlockToEdit, ...blockData };
+            }
+        } else {
+            // Adding new block
+            dayBlocks.push({ ...blockData, id: Date.now().toString() });
+        }
+        newPlanningData[dateKey] = dayBlocks;
+        return newPlanningData;
+    });
+    handleCloseModal();
+  };
+
+  const handleDeletePlanningBlock = (date: Date, blockId: string) => {
+    const dateKey = formatDateKey(date);
+    setPlanningData(prev => {
+        const newPlanningData = { ...prev };
+        const dayBlocks = newPlanningData[dateKey] ? [...newPlanningData[dateKey]] : [];
+        const updatedBlocks = dayBlocks.filter(b => b.id !== blockId);
+        if (updatedBlocks.length > 0) {
+            newPlanningData[dateKey] = updatedBlocks;
+        } else {
+            delete newPlanningData[dateKey];
+        }
+        return newPlanningData;
+    });
+    handleCloseModal();
+};
 
   const openAddModal = () => {
     setActivityToEdit(null);
@@ -796,48 +999,60 @@ const App: React.FC = () => {
     setIsSettingsOpen(false);
   };
   
+  const handleOpenShareModal = () => {
+    setIsShareModalOpen(true);
+  };
+
   const handleWelcomeFinish = (data: SetupData) => {
     if (data.name.trim()) setUserName(data.name.trim());
     
+    setUserRole(data.role);
+
+    switch (data.role) {
+      case 'publisher':
+      case 'aux_pioneer':
+        setGoal(30);
+        break;
+      case 'spec_pioneer':
+        setGoal(100);
+        break;
+      case 'reg_pioneer':
+      default:
+        setGoal(50);
+        break;
+    }
+    
     const now = new Date();
     const serviceYear = getServiceYear(now);
-    
-    if (Object.keys(data.previousHours).length > 0) {
-        const yearArchives: Record<string, HistoryLog> = {};
-        let hoursForCurrentMonth = 0;
-        
-        Object.entries(data.previousHours).forEach(([dateKey, hours]) => {
-            if (hours > 0) {
-                const entryDate = new Date(dateKey);
-                const entryServiceYear = getServiceYear(entryDate);
-                if (!yearArchives[entryServiceYear]) {
-                    yearArchives[entryServiceYear] = {};
-                }
-                const monthKey = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, '0')}-SUMMARY`;
-                yearArchives[entryServiceYear][monthKey] = { hours, isSummary: true };
+    const yearArchives: Record<string, HistoryLog> = {};
 
-                if (entryDate.getFullYear() === now.getFullYear() && entryDate.getMonth() === now.getMonth()) {
-                    hoursForCurrentMonth += hours;
-                }
+    // Process hours from previous months of the service year
+    Object.entries(data.previousHours).forEach(([dateKey, hours]) => {
+        if (hours > 0) {
+            const entryDate = new Date(`${dateKey}T12:00:00`);
+            const entryServiceYear = getServiceYear(entryDate);
+            if (!yearArchives[entryServiceYear]) {
+                yearArchives[entryServiceYear] = {};
             }
-        });
-        
-        // This logic is tricky. If they input hours for the current month, it might be better to just set currentHours
-        // without creating a summary entry, as they will start adding daily entries.
-        // For now, let's assume the welcome hours for the current month are a starting point.
-        // We will sum them up, but a summary key for the current month might be confusing.
-        const currentMonthSummaryKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-SUMMARY`;
-        if (yearArchives[serviceYear] && yearArchives[serviceYear][currentMonthSummaryKey]) {
-           hoursForCurrentMonth = yearArchives[serviceYear][currentMonthSummaryKey].hours;
-           delete yearArchives[serviceYear][currentMonthSummaryKey]; // Don't create summary for active month
+
+            const monthKey = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, '0')}-SUMMARY`;
+            yearArchives[entryServiceYear][monthKey] = { hours, isSummary: true };
         }
-
-
-        setCurrentHours(hoursForCurrentMonth);
-        if(hoursForCurrentMonth > 0) updateStreak();
-        setArchives(yearArchives);
-        setCurrentServiceYear(serviceYear);
+    });
+    
+    // Process hours for the current month
+    if (data.currentMonthHours > 0) {
+        const carryoverKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-CARRYOVER`;
+        if (!yearArchives[serviceYear]) {
+            yearArchives[serviceYear] = {};
+        }
+        yearArchives[serviceYear][carryoverKey] = { hours: data.currentMonthHours };
     }
+
+    setArchives(prev => ({...prev, ...yearArchives}));
+    setCurrentServiceYear(serviceYear);
+    setCurrentHours(data.currentMonthHours);
+    if(data.currentMonthHours > 0) updateStreak();
 
     localStorage.setItem(WELCOME_SHOWN_KEY, 'true');
     setShowWelcome(false);
@@ -917,6 +1132,7 @@ const App: React.FC = () => {
         const newCurrentDate = new Date(importedState.currentDate);
         setUserName(importedState.userName);
         setGoal(importedState.goal);
+        setUserRole(importedState.userRole || 'reg_pioneer');
         setCurrentDate(newCurrentDate);
         setProgressShape(importedState.progressShape);
         setThemeColor(importedState.themeColor);
@@ -929,18 +1145,36 @@ const App: React.FC = () => {
         setGroupArrangements(importedState.groupArrangements);
         setStreak(importedState.streak);
         setLastLogDate(importedState.lastLogDate ? new Date(importedState.lastLogDate) : null);
-        setStreakRestores(importedState.streakRestores);
-        setLastRestoreMonth(importedState.lastRestoreMonth);
         setProtectedDay(importedState.protectedDay);
+        setPlanningData(importedState.planningData || {});
     }
     setImportConfirmModalOpen(false);
     setImportedState(null);
+  };
+
+  const handleConfirmCommemorationTheme = () => {
+    setThemeColor('wine');
+    const serviceYear = getServiceYear(new Date());
+    localStorage.setItem(`garden-commemoration-alert-shown-${serviceYear}`, 'true');
+    setIsCommemorationModalOpen(false);
+  };
+
+  const handleDeclineCommemorationTheme = () => {
+    const serviceYear = getServiceYear(new Date());
+    localStorage.setItem(`garden-commemoration-alert-shown-${serviceYear}`, 'true');
+    setIsCommemorationModalOpen(false);
+  };
+  
+  const handleStartFirstLog = () => {
+    setStreakTutorialModalOpen(false);
+    openAddModal();
   };
 
   const viewTitleMap: Record<AppView, string> = {
     tracker: 'Garden',
     activity: 'Actividad',
     history: 'Historial',
+    planning: 'Planificación',
   };
   const viewTitle = viewTitleMap[activeView];
 
@@ -981,14 +1215,15 @@ const App: React.FC = () => {
               currentHours={currentHours}
               currentLdcHours={currentLdcHours}
               goal={goal}
+              userRole={userRole}
               currentDate={currentDate}
               onEditClick={openEditModal} 
               onEditLdcClick={openEditLdcModal}
               onAddHours={handleAddHours}
               progressShape={progressShape}
               themeColor={themeColor}
-              onSettingsClick={() => setIsSettingsOpen(true)}
               onHelpClick={() => setHelpModalOpen(true)}
+              onShareReport={handleOpenShareModal}
               notificationPermission={notificationPermission}
               onRequestNotificationPermission={requestNotificationPermission}
               performanceMode={performanceMode}
@@ -997,8 +1232,12 @@ const App: React.FC = () => {
               isGhostMode={isGhostMode}
               onToggleGhostMode={() => setIsGhostMode(p => !p)}
               previousMonthHistory={previousMonthHistory}
+              isStatsMode={isStatsMode}
+              archives={archives}
+              currentServiceYear={currentServiceYear}
+              activities={activities}
             />
-            <GreetingCard userName={userName} themeColor={themeColor} performanceMode={performanceMode} />
+            {!isStatsMode && <GreetingCard userName={userName} themeColor={themeColor} performanceMode={performanceMode} />}
           </>
         );
       case 'activity':
@@ -1012,6 +1251,7 @@ const App: React.FC = () => {
                   isOnline={isOnline}
                   performanceMode={performanceMode}
                   currentDate={currentDate}
+                  isPrivacyMode={isPrivacyMode}
                 />;
       case 'history':
         return <HistoryView 
@@ -1021,6 +1261,14 @@ const App: React.FC = () => {
           isPrivacyMode={isPrivacyMode}
           onDayClick={handleDayClickForHistory}
           activities={activities}
+          planningData={planningData}
+        />;
+      case 'planning':
+        return <PlanningView
+          planningData={planningData}
+          activities={activities}
+          onOpenModal={handleOpenPlanningModal}
+          themeColor={themeColor}
         />;
       default:
         return null;
@@ -1048,6 +1296,7 @@ const App: React.FC = () => {
         streak={streak}
         onStreakClick={() => setIsStreakModalOpen(true)}
         onMenuClick={() => setSidebarOpen(true)}
+        onTitleClick={() => setIsStatsMode(s => !s)}
       />
 
       <Sidebar
@@ -1063,6 +1312,10 @@ const App: React.FC = () => {
         onSetRemindersEnabled={handleSetRemindersEnabled}
         reminderTime={reminderTime}
         onSetReminderTime={setReminderTime}
+        onSettingsClick={() => {
+          setSidebarOpen(false);
+          setIsSettingsOpen(true);
+        }}
       />
       <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" className="hidden" />
       
@@ -1101,6 +1354,20 @@ const App: React.FC = () => {
         onMarkDayStatus={handleMarkDayStatus}
         archives={archives}
         activities={activities}
+        planningData={planningData}
+        userRole={userRole}
+      />
+      
+      <PlanningModal
+          isOpen={isPlanningModalOpen}
+          onClose={handleCloseModal}
+          date={dateForPlanning}
+          blockToEdit={planningBlockToEdit}
+          onSave={handleSavePlanningBlock}
+          onDelete={handleDeletePlanningBlock}
+          activities={activities}
+          themeColor={themeColor}
+          performanceMode={performanceMode}
       />
 
       <SettingsModal
@@ -1128,11 +1395,34 @@ const App: React.FC = () => {
         isOpen={isStreakModalOpen}
         onClose={() => setIsStreakModalOpen(false)}
         streak={streak}
-        streakRestores={streakRestores}
         themeColor={themeColor}
         protectedDay={protectedDay}
         onSetProtectedDay={setProtectedDay}
         performanceMode={performanceMode}
+      />
+
+      <StreakTutorialModal
+        isOpen={isStreakTutorialModalOpen}
+        onClose={() => setStreakTutorialModalOpen(false)}
+        onAddHoursClick={handleStartFirstLog}
+        themeColor={themeColor}
+        performanceMode={performanceMode}
+        currentHours={currentHours}
+      />
+      
+      <ShareReportModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        userName={userName}
+        currentDate={currentDate}
+        currentHours={currentHours}
+        currentLdcHours={currentLdcHours}
+        activities={activities}
+        themeColor={themeColor}
+        onCopy={() => {
+          setIsShareModalOpen(false);
+          setShowShareToast(true);
+        }}
       />
 
       <GoalReachedModal
@@ -1163,6 +1453,14 @@ const App: React.FC = () => {
         themeColor={themeColor}
       />
 
+      <CommemorationModal
+        isOpen={isCommemorationModalOpen}
+        onConfirm={handleConfirmCommemorationTheme}
+        onDecline={handleDeclineCommemorationTheme}
+        themeColor={themeColor}
+        performanceMode={performanceMode}
+      />
+
       <TutorialConfirmationModal
         isOpen={!!tutorialToConfirm}
         onStart={() => handleStartTutorial(tutorialToConfirm!)}
@@ -1180,7 +1478,7 @@ const App: React.FC = () => {
       />
 
       <OfflineToast isVisible={isOfflineReady} onDismiss={() => setIsOfflineReady(false)} />
-      <StreakRestoreToast isVisible={showStreakRestoreToast} onDismiss={() => setShowStreakRestoreToast(false)} />
+      <ShareToast isVisible={showShareToast} onDismiss={() => setShowShareToast(false)} />
     </div>
   );
 };

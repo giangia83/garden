@@ -1,14 +1,17 @@
+
 import React, { useState, useEffect } from 'react';
 import ToggleSwitch from './ToggleSwitch';
 import { ThemeColor } from '../types';
 import { THEMES } from '../constants';
-import { CreditCardIcon } from './icons/CreditCardIcon';
+import { HeartIcon } from './icons/HeartIcon';
+import { ChatBubbleBottomCenterTextIcon } from './icons/ChatBubbleBottomCenterTextIcon';
 import { BoltIcon } from './icons/BoltIcon';
 import { HomeModernIcon } from './icons/HomeModernIcon';
 import { GardenIcon } from './icons/GardenIcon';
 import { ArrowDownTrayIcon } from './icons/ArrowDownTrayIcon';
 import { ArrowUpTrayIcon } from './icons/ArrowUpTrayIcon';
 import { BellIcon } from './icons/BellIcon';
+import { SettingsIcon } from './icons/SettingsIcon';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -23,6 +26,7 @@ interface SidebarProps {
   onSetRemindersEnabled: (enabled: boolean) => void;
   reminderTime: string;
   onSetReminderTime: (time: string) => void;
+  onSettingsClick: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -38,6 +42,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   onSetRemindersEnabled,
   reminderTime,
   onSetReminderTime,
+  onSettingsClick,
 }) => {
   const [hasBeenOpened, setHasBeenOpened] = useState(false);
   const theme = THEMES[themeColor] || THEMES.blue;
@@ -117,6 +122,10 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="mb-6">
             <h3 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Acciones</h3>
             <div className="bg-white dark:bg-slate-800 rounded-lg divide-y divide-slate-200 dark:divide-slate-700">
+                <button onClick={onSettingsClick} className="w-full text-left p-3 flex items-center hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                    <SettingsIcon className={`w-6 h-6 mr-3 ${theme.text}`} />
+                    <p className="font-semibold text-slate-700 dark:text-slate-200">Configuración</p>
+                </button>
                 <button onClick={onShowWelcome} className="w-full text-left p-3 flex items-center hover:bg-slate-50 dark:hover:bg-slate-700/50">
                     <HomeModernIcon className={`w-6 h-6 mr-3 ${theme.text}`} />
                     <p className="font-semibold text-slate-700 dark:text-slate-200">Ver Bienvenida</p>
@@ -125,15 +134,27 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
         
         {/* Credits */}
+        <div className="mb-6">
+          <h3 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Créditos</h3>
+          <div className="flex items-center p-3 bg-white dark:bg-slate-800 rounded-lg">
+            <HeartIcon className={`w-6 h-6 mr-3 ${theme.text}`} />
+            <p className="font-semibold text-slate-700 dark:text-slate-200">Desarrollado con amor</p>
+          </div>
+        </div>
+
+        {/* Feedback */}
         <div>
-            <h3 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Créditos</h3>
-            <div className="flex items-center p-3 bg-white dark:bg-slate-800 rounded-lg">
-                <CreditCardIcon className={`w-6 h-6 mr-3 ${theme.text}`} />
-                <div>
-                    <p className="font-semibold text-slate-700 dark:text-slate-200">Desarrollado por</p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Gianfranco Iadarola</p>
-                </div>
+          <h3 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Feedback</h3>
+          <a 
+            href="mailto:giangia83@gmail.com"
+            className="w-full text-left p-3 flex items-center bg-white dark:bg-slate-800 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50"
+          >
+            <ChatBubbleBottomCenterTextIcon className={`w-6 h-6 mr-3 ${theme.text}`} />
+            <div>
+              <p className="font-semibold text-slate-700 dark:text-slate-200">Feedback y Sugerencias</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">giangia83@gmail.com</p>
             </div>
+          </a>
         </div>
 
       </div>

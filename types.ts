@@ -1,5 +1,5 @@
 // FIX: Define ThemeColor here to break circular dependency with constants.ts
-export type ThemeColor = 'blue' | 'pink' | 'green' | 'orange' | 'purple' | 'teal' | 'indigo' | 'red';
+export type ThemeColor = 'blue' | 'pink' | 'green' | 'orange' | 'purple' | 'teal' | 'indigo' | 'red' | 'yellow' | 'wine' | 'bw';
 
 export type ThemeMode = 'light' | 'dark' | 'black';
 
@@ -48,9 +48,13 @@ export type GroupArrangement = {
   territory?: string;
 };
 
+export type UserRole = 'publisher' | 'aux_pioneer' | 'reg_pioneer' | 'spec_pioneer';
+
 export type SetupData = {
   name: string;
   previousHours: { [dateKey: string]: number };
+  role: UserRole;
+  currentMonthHours: number;
 };
 
 export type TutorialStep = {
@@ -62,7 +66,7 @@ export type TutorialStep = {
 };
 
 export type TutorialsSeen = {
-  [key in 'tracker' | 'activity' | 'history']?: boolean;
+  [key in 'tracker' | 'activity' | 'history' | 'planning']?: boolean;
 };
 
 export type AppState = {
@@ -70,6 +74,7 @@ export type AppState = {
   currentLdcHours: number;
   userName: string;
   goal: number;
+  userRole: UserRole;
   currentDate: string; // ISO string
   progressShape: Shape;
   themeColor: ThemeColor;
@@ -80,7 +85,17 @@ export type AppState = {
   groupArrangements: GroupArrangement[];
   streak: number;
   lastLogDate: string | null; // ISO string
-  streakRestores: number;
-  lastRestoreMonth: number;
   protectedDay: number | null;
+  planningData?: PlanningData;
+};
+
+export type PlanningBlock = {
+  id: string;
+  title: string;
+  timeRange?: string;
+  activityIds: string[];
+};
+
+export type PlanningData = {
+  [dateKey: string]: PlanningBlock[];
 };
