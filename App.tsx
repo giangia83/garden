@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import ServiceTracker from './components/ServiceTracker';
@@ -28,6 +29,7 @@ const TUTORIALS_SEEN_KEY = 'garden-tutorials-seen';
 const TUTORIAL_AGREEMENT_KEY = 'garden-tutorial-agreement';
 const SETTINGS_KEY = 'garden-settings';
 const PRIVACY_MODE_KEY = 'garden-privacy-mode';
+// FIX: Define REMINDER_LAST_SENT_KEY constant
 const REMINDER_LAST_SENT_KEY = 'garden-reminder-last-sent';
 
 type AppView = 'tracker' | 'activity' | 'history';
@@ -35,6 +37,7 @@ type AppView = 'tracker' | 'activity' | 'history';
 const TUTORIALS: Record<AppView, TutorialStep[]> = {
   tracker: [
     { target: '#progress-display-container', title: 'Tu Progreso Mensual', content: 'Este es el corazón de tu informe. Muestra tu avance hacia la meta. ¡Tócalo para editar tu total de horas!', position: 'bottom' },
+    { target: '#ghost-mode-toggle', title: 'Modo Fantasma', content: 'Compite contra ti mismo. El fantasma marca las horas que llevabas en la misma fecha del mes anterior. Ten en cuenta que esta función estará disponible después de que completes tu primer mes de registro en la app.', position: 'bottom' },
     { target: '#timer-section', title: 'Temporizador Integrado', content: 'Usa el temporizador para registrar tu servicio en tiempo real. ¡No perderás ni un minuto!', position: 'top' },
     { target: '#streak-indicator', title: 'Tu Racha Diaria', content: '¡Mantén la motivación! Toca aquí para ver los detalles de tu racha y configurar tu día de descanso.', position: 'bottom' },
     { target: '#add-hours-button', title: 'Añadir Horas y Actividad', content: 'Usa este botón para añadir rápidamente las horas de tus sesiones de predicación o para registrar una revisita o estudio.', position: 'top' },
@@ -209,6 +212,7 @@ const App: React.FC = () => {
   const [reminderTime, setReminderTime] = useState(initialSettings.reminderTime);
 
   const [isPrivacyMode, setIsPrivacyMode] = useState(getInitialPrivacyMode());
+  const [isGhostMode, setIsGhostMode] = useState(false);
 
   const [showWelcome, setShowWelcome] = useState(!localStorage.getItem(WELCOME_SHOWN_KEY));
 
@@ -509,7 +513,7 @@ const App: React.FC = () => {
     setAddHoursModalOpen(false);
   }
 
-  const handleSetHoursForDate = (newTotalHours: number, date: Date, weather?: WeatherCondition) => {
+  const handleSetHoursForDate = (newTotalHours: number, date: Date, weather?: WeatherCondition, isCampaign?: boolean) => {
     const dateKey = formatDateKey(date);
     const serviceYear = getServiceYear(date);
 
@@ -525,9 +529,15 @@ const App: React.FC = () => {
           weather: weather || oldEntry.weather, // Keep old weather if not specified
       };
       
+      if (isCampaign) {
+        newEntry.isCampaign = true;
+      } else {
+        delete newEntry.isCampaign;
+      }
+      
       if(newEntry.status === 'sick') newEntry.hours = 0;
 
-      if (newEntry.hours > 0 || newEntry.weather || newEntry.status) {
+      if (newEntry.hours > 0 || newEntry.weather || newEntry.status || newEntry.isCampaign) {
         yearHistory[dateKey] = newEntry;
       } else {
         delete yearHistory[dateKey];
@@ -575,7 +585,7 @@ const App: React.FC = () => {
             delete newEntry.status;
         }
 
-        if (newEntry.hours > 0 || newEntry.weather || newEntry.status) {
+        if (newEntry.hours > 0 || newEntry.weather || newEntry.status || newEntry.isCampaign) {
             yearHistory[dateKey] = newEntry;
         } else {
             delete yearHistory[dateKey];
@@ -602,12 +612,17 @@ const App: React.FC = () => {
     setDateToEdit(null);
   };
 
-  const handleSaveActivity = (data: Omit<ActivityItem, 'id' | 'date'>) => {
+  const handleSaveActivity = (data: Omit<ActivityItem, 'id' | 'date'> & { recurring?: boolean }) => {
+    const activityDate = dateToEdit || new Date();
     if (activityToEdit) {
       const updatedActivity = { ...activityToEdit, ...data };
       setActivities(prev => prev.map(a => a.id === updatedActivity.id ? updatedActivity : a));
     } else {
-      const newActivity: ActivityItem = { ...data, id: Date.now().toString(), date: new Date().toISOString() };
+      const newActivity: ActivityItem = { 
+        ...data, 
+        id: Date.now().toString(), 
+        date: activityDate.toISOString() 
+      };
       setActivities(prev => [newActivity, ...prev]);
     }
     handleCloseModal();
@@ -669,13 +684,25 @@ const App: React.FC = () => {
                 if (!yearArchives[entryServiceYear]) {
                     yearArchives[entryServiceYear] = {};
                 }
-                yearArchives[entryServiceYear][dateKey] = { hours };
+                const monthKey = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, '0')}-SUMMARY`;
+                yearArchives[entryServiceYear][monthKey] = { hours, isSummary: true };
 
                 if (entryDate.getFullYear() === now.getFullYear() && entryDate.getMonth() === now.getMonth()) {
                     hoursForCurrentMonth += hours;
                 }
             }
         });
+        
+        // This logic is tricky. If they input hours for the current month, it might be better to just set currentHours
+        // without creating a summary entry, as they will start adding daily entries.
+        // For now, let's assume the welcome hours for the current month are a starting point.
+        // We will sum them up, but a summary key for the current month might be confusing.
+        const currentMonthSummaryKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-SUMMARY`;
+        if (yearArchives[serviceYear] && yearArchives[serviceYear][currentMonthSummaryKey]) {
+           hoursForCurrentMonth = yearArchives[serviceYear][currentMonthSummaryKey].hours;
+           delete yearArchives[serviceYear][currentMonthSummaryKey]; // Don't create summary for active month
+        }
+
 
         setCurrentHours(hoursForCurrentMonth);
         if(hoursForCurrentMonth > 0) updateStreak();
@@ -786,6 +813,33 @@ const App: React.FC = () => {
   };
   const viewTitle = viewTitleMap[activeView];
 
+  const previousMonthHistory = useMemo(() => {
+    const prevMonthDate = new Date(currentDate);
+    prevMonthDate.setMonth(prevMonthDate.getMonth() - 1);
+    
+    const prevMonthServiceYear = getServiceYear(prevMonthDate);
+    const prevYearHistory = archives[prevMonthServiceYear] || {};
+
+    const prevMonth = prevMonthDate.getMonth();
+    const prevYear = prevMonthDate.getFullYear();
+
+    const filteredHistory: HistoryLog = {};
+    for (const dateKey in prevYearHistory) {
+        const entryDate = new Date(dateKey + "T12:00:00Z"); // Use noon to avoid TZ issues
+        if (entryDate.getUTCMonth() === prevMonth && entryDate.getUTCFullYear() === prevYear) {
+            filteredHistory[dateKey] = prevYearHistory[dateKey];
+        }
+         // Also include summary keys
+        if (dateKey.endsWith('-SUMMARY')) {
+            const [year, month] = dateKey.split('-').map(Number);
+            if (year === prevYear && (month - 1) === prevMonth) {
+                filteredHistory[dateKey] = prevYearHistory[dateKey];
+            }
+        }
+    }
+    return filteredHistory;
+  }, [currentDate, archives]);
+
 
   const renderContent = () => {
     switch (activeView) {
@@ -807,6 +861,9 @@ const App: React.FC = () => {
               performanceMode={performanceMode}
               isPrivacyMode={isPrivacyMode}
               onTogglePrivacyMode={() => setIsPrivacyMode(p => !p)}
+              isGhostMode={isGhostMode}
+              onToggleGhostMode={() => setIsGhostMode(p => !p)}
+              previousMonthHistory={previousMonthHistory}
             />
             <GreetingCard userName={userName} themeColor={themeColor} performanceMode={performanceMode} />
           </>

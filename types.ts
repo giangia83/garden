@@ -1,4 +1,4 @@
-// FIX: Define ThemeColor directly to resolve a circular dependency and export it for other components to use.
+
 export type ThemeColor = 'blue' | 'pink' | 'green' | 'orange' | 'purple' | 'teal' | 'indigo' | 'red';
 
 export type ThemeMode = 'light' | 'dark' | 'black';
@@ -12,6 +12,8 @@ export type DayEntry = {
   hours: number;
   status?: DayStatus;
   weather?: WeatherCondition;
+  isSummary?: boolean;
+  isCampaign?: boolean;
 };
 
 export type HistoryLog = {
@@ -34,6 +36,7 @@ export type ActivityItem = {
   date: string; // ISO string
   lat?: number;
   lng?: number;
+  recurring?: boolean;
 };
 
 export type GroupArrangement = {

@@ -12,20 +12,21 @@ import { MedicalIcon } from './icons/MedicalIcon';
 import { ArrowUturnLeftIcon } from './icons/ArrowUturnLeftIcon';
 import { AcademicCapIcon } from './icons/AcademicCapIcon';
 import { XCircleIcon } from './icons/XCircleIcon';
+import ToggleSwitch from './ToggleSwitch';
 
 interface AddHoursModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddHours: (hours: number, weather?: WeatherCondition) => void;
   onSetHours: (hours: number) => void;
-  onSaveActivity: (activity: { type: ActivityType; name: string; location?: string; comments?: string; }) => void;
+  onSaveActivity: (activity: Omit<ActivityItem, 'id' | 'date'> & { recurring?: boolean }) => void;
   activityToEdit: ActivityItem | null;
   currentHours: number;
   isEditMode: boolean;
   themeColor: ThemeColor;
   performanceMode: boolean;
   dateForEntry: Date | null;
-  onSetHoursForDate: (hours: number, date: Date, weather?: WeatherCondition) => void;
+  onSetHoursForDate: (hours: number, date: Date, weather?: WeatherCondition, isCampaign?: boolean) => void;
   onMarkDayStatus: (date: Date, status: DayStatus | null) => void;
   archives: Record<string, HistoryLog>;
   activities: ActivityItem[];
@@ -66,6 +67,9 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
   const [name, setName] = useState('');
   const [location, setLocation] = useState('');
   const [comments, setComments] = useState('');
+  const [isRecurringActivity, setIsRecurringActivity] = useState(false);
+  const [isCampaignDay, setIsCampaignDay] = useState(false);
+
 
   const [hasBeenOpened, setHasBeenOpened] = useState(false);
   const theme = THEMES[themeColor] || THEMES.blue;
@@ -106,13 +110,17 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
         setComments(activityToEdit.comments || '');
         setHoursInput('');
         setSelectedWeather(undefined);
+        setIsRecurringActivity(activityToEdit.recurring || false);
+        setIsCampaignDay(false);
       } else if (dateForEntry) {
         setHoursInput(dayEntryForDate && dayEntryForDate.hours > 0 ? hoursToHHMM(dayEntryForDate.hours) : '');
         setSelectedWeather(dayEntryForDate?.weather);
+        setIsCampaignDay(dayEntryForDate?.isCampaign || false);
         setActiveTab('hours');
         setName('');
         setLocation('');
         setComments('');
+        setIsRecurringActivity(false);
       } else {
         if (isEditMode) {
           setHoursInput(hoursToHHMM(currentHours));
@@ -125,6 +133,8 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
         setComments('');
         setActiveTab('hours');
         setSelectedWeather(undefined);
+        setIsRecurringActivity(false);
+        setIsCampaignDay(false);
       }
     }
   }, [isOpen, activityToEdit, currentHours, isEditMode, dateForEntry, dayEntryForDate]);
@@ -147,7 +157,7 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
       const finalHours = (isNaN(hoursValue) || hoursValue < 0) ? 0 : hoursValue;
 
       if (isEditingForDate) {
-        onSetHoursForDate(finalHours, dateForEntry!, selectedWeather);
+        onSetHoursForDate(finalHours, dateForEntry!, selectedWeather, isCampaignDay);
       } else if (isEditMode) {
         onSetHours(finalHours);
       } else {
@@ -160,13 +170,24 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
         name,
         location,
         comments,
+        recurring: isRecurringActivity,
       });
     }
   };
   
   const getModalTitle = () => {
     if (isEditingActivity) return `Editar ${activityToEdit.type === 'study' ? 'Estudio' : 'Revisita'}`;
-    if (dateForEntry) return `Actividad del ${dateForEntry.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}`;
+    if (dateForEntry) {
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const entryDate = new Date(dateForEntry);
+        entryDate.setHours(0,0,0,0);
+
+        if (entryDate.getTime() >= today.getTime()) {
+            return `Planificar para ${dateForEntry.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}`;
+        }
+        return `Actividad del ${dateForEntry.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}`;
+    }
     if (isEditMode) return 'Editar Total de Horas';
     return 'Añadir Actividad';
   };
@@ -223,13 +244,13 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
             )}
             
             {activeTab === 'hours' && (
-              <>
-                <h2 id="add-hours-title" className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6 text-center">
+              <div className="space-y-4">
+                <h2 id="add-hours-title" className="text-2xl font-bold text-slate-900 dark:text-slate-100 text-center">
                   {getModalTitle()}
                 </h2>
 
                 {isEditingForDate && activitiesForDay.length > 0 && (
-                  <div className="mb-4">
+                  <div>
                     <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-2 text-center">Actividad del Día</h3>
                     <div className="space-y-2">
                       {activitiesForDay.map(act => (
@@ -242,7 +263,7 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
                   </div>
                 )}
 
-                <div className="mb-4">
+                <div>
                   <label htmlFor="hours-input" className="sr-only">Horas</label>
                   <input
                     id="hours-input"
@@ -259,7 +280,7 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
                 {!isHoursValid && <p className="text-red-600 text-sm text-center -mt-2 mb-2">Formato inválido. Usa H:MM, H.MM o solo horas.</p>}
                 
                 {(!isEditMode || isEditingForDate) && (
-                    <div className="mb-4">
+                    <div>
                         <label className="block text-center text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">¿Qué tal estuvo el clima?</label>
                         <div className="flex justify-center space-x-3">
                             {weatherOptions.map(({ id, Icon, label, selectedClass }) => (
@@ -277,7 +298,16 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
                         </div>
                     </div>
                 )}
-              </>
+
+                {isEditingForDate && (
+                    <div className="bg-white dark:bg-slate-800 p-3 rounded-lg space-y-3 border border-slate-200 dark:border-slate-700">
+                         <div className="flex items-center justify-between">
+                            <label htmlFor="campaign-toggle" className="font-semibold text-slate-700 dark:text-slate-200">Día de Campaña</label>
+                            <ToggleSwitch checked={isCampaignDay} onChange={setIsCampaignDay} themeColor={themeColor}/>
+                        </div>
+                    </div>
+                )}
+              </div>
             )}
 
             {(activeTab === 'visit' || activeTab === 'study') && (
@@ -305,6 +335,12 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
                      <span className="absolute top-3 left-0 flex items-center pl-3"><DocumentTextIcon className="h-5 w-5 text-slate-400 dark:text-slate-500" /></span>
                     <textarea id="comments-input" value={comments} onChange={e => setComments(e.target.value)} placeholder="Comentarios (tema, próxima visita, etc.)" rows={3} className={`w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 ${theme.ring} outline-none transition resize-none dark:text-white`}></textarea>
                   </div>
+                </div>
+                 <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center justify-between">
+                        <label htmlFor="recurring-toggle" className="font-semibold text-slate-700 dark:text-slate-200">Repetir cada semana</label>
+                        <ToggleSwitch checked={isRecurringActivity} onChange={setIsRecurringActivity} themeColor={themeColor}/>
+                    </div>
                 </div>
               </div>
             )}

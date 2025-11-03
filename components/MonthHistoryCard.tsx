@@ -1,6 +1,7 @@
 
+
 import React, { useMemo } from 'react';
-import { HistoryLog, ThemeColor } from '../types';
+import { HistoryLog, ThemeColor, DayEntry } from '../types';
 import { THEMES } from '../constants';
 import { ChevronDownIcon } from './icons/ChevronDownIcon';
 import { hoursToHHMM } from '../utils';
@@ -35,8 +36,7 @@ const MonthHistoryCard: React.FC<MonthHistoryCardProps> = ({
 
   const dailyEntries = useMemo(() => {
     return Object.entries(history)
-      // FIX: The 'hours' variable was a DayEntry object. Destructure to get the numeric 'hours' property.
-      .map(([dateStr, dayEntry]) => ({ date: new Date(dateStr + 'T12:00:00Z'), hours: dayEntry.hours }))
+      .map(([dateStr, dayEntry]) => ({ date: new Date(dateStr + 'T12:00:00Z'), hours: (dayEntry as DayEntry).hours }))
       .filter(entry => 
         !isNaN(entry.date.getTime()) &&
         entry.date.getUTCFullYear() === year && 

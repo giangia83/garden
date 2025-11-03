@@ -13,6 +13,7 @@ import { SunIcon } from './icons/SunIcon';
 import { MoonIcon } from './icons/MoonIcon';
 import { SolidCircleIcon } from './icons/SolidCircleIcon';
 import { CheckIcon } from './icons/CheckIcon';
+import { GhostIcon } from './icons/GhostIcon';
 
 interface WelcomeProps {
   onFinish: (data: SetupData) => void;
@@ -72,6 +73,12 @@ const slideData: Slide[] = [
     icon: (theme: Theme) => <GardenIcon className={`w-16 h-16 ${theme.text}`} />,
     title: "Mantén tu racha",
     description: "Cada día que registres horas, tu racha aumentará. Los sábados y domingos no rompen tu racha. Y si olvidas un día, ¡no te preocupes! Tienes 3 restauradores automáticos cada mes.",
+  },
+  {
+    type: 'feature',
+    icon: (theme: Theme) => <GhostIcon className={`w-16 h-16 ${theme.text}`} />,
+    title: "Compite contra ti mismo",
+    description: "Activa el modo fantasma para ver tu progreso del mes pasado. Esta función se activará automáticamente después de tu primer mes completo de uso.",
   },
   {
     type: 'feature',
@@ -139,7 +146,33 @@ const Welcome: React.FC<WelcomeProps> = ({
   });
   
   const [animatedStreak, setAnimatedStreak] = useState(1);
+  const [isSetupValid, setIsSetupValid] = useState(false);
   const streakSlideIndex = 2; // "Mantén tu racha"
+
+  const monthsForSetup = useMemo(() => getServiceYearMonthsForSetup(), []);
+
+  useEffect(() => {
+    const isSetupSlideActive = slideData[currentSlide]?.type === 'setup';
+    if (!isSetupSlideActive) {
+      // No need to validate if not on the setup slide
+      return;
+    }
+  
+    const now = new Date();
+    // Months that are not the current month are mandatory
+    const pastMonthsToValidate = monthsForSetup.filter(
+      (month) => !(month.getMonth() === now.getMonth() && month.getFullYear() === now.getFullYear())
+    );
+  
+    // Check if every mandatory month has an entry in the previousHours object
+    const allPastMonthsEntered = pastMonthsToValidate.every((month) => {
+      const dateKey = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}-01`;
+      return setupData.previousHours.hasOwnProperty(dateKey);
+    });
+  
+    setIsSetupValid(allPastMonthsEntered);
+  }, [setupData.previousHours, monthsForSetup, currentSlide]);
+
 
   useEffect(() => {
     let animationFrameId: number;
@@ -179,9 +212,6 @@ const Welcome: React.FC<WelcomeProps> = ({
       }
     };
   }, [currentSlide, streakSlideIndex, performanceMode]);
-
-
-  const monthsForSetup = useMemo(() => getServiceYearMonthsForSetup(), []);
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSetupData(prev => ({ ...prev, name: e.target.value }));
@@ -234,6 +264,10 @@ const Welcome: React.FC<WelcomeProps> = ({
     { name: 'dark', Icon: MoonIcon, label: 'Oscuro' },
     { name: 'black', Icon: SolidCircleIcon, label: 'Negro' },
   ];
+  
+  const isSetupSlide = slideData[currentSlide].type === 'setup';
+  const isButtonDisabled = isSetupSlide && !isSetupValid;
+
 
   return (
     <div className={`fixed inset-0 z-50 flex flex-col items-center justify-between p-6 text-center transition-colors duration-500 ${
@@ -260,7 +294,6 @@ const Welcome: React.FC<WelcomeProps> = ({
                   ) : slide.type === 'customize' ? (
                     <>
                       <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-2 tracking-tight">{slide.title}</h2>
-                      {/* FIX: Handle function type for slide description to resolve TypeScript error. */}
                       <p className="text-slate-600 dark:text-slate-400 max-w-sm leading-relaxed mb-4">{typeof slide.description === 'function' ? slide.description(setupData.name) : slide.description}</p>
                       
                       <div className="w-full max-w-sm text-left space-y-3">
@@ -331,7 +364,6 @@ const Welcome: React.FC<WelcomeProps> = ({
                   ) : slide.type === 'setup' ? (
                     <>
                       <h2 className="text-4xl font-bold text-white mb-2 tracking-tight">{slide.title}</h2>
-                      {/* FIX: Handle function type for slide description to resolve TypeScript error. */}
                       <p className="text-slate-200 max-w-sm leading-relaxed mb-4">{typeof slide.description === 'function' ? slide.description(setupData.name) : slide.description}</p>
                       <div className="w-full max-w-sm text-left space-y-4 bg-white dark:bg-slate-800 p-4 rounded-xl shadow-inner h-full max-h-80 flex flex-col">
                           <div className="flex-shrink-0">
@@ -343,16 +375,20 @@ const Welcome: React.FC<WelcomeProps> = ({
                           </div>
                           {monthsForSetup.length > 0 && (
                                <div className="flex-grow flex flex-col min-h-0">
-                                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300 flex-shrink-0">Horas de este año de servicio (opcional)</label>
+                                  <div className="flex-shrink-0">
+                                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Horas de este año de servicio</label>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Ingresa las horas de los meses anteriores (<span className="text-red-500">*</span>) para activar el 'Modo Fantasma'.</p>
+                                  </div>
                                   <div className="mt-2 space-y-2 overflow-y-auto pr-2 flex-grow">
                                   {monthsForSetup.map(date => {
-                                      const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-15`;
+                                      const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`;
                                       const monthName = date.toLocaleDateString('es-ES', { month: 'long' });
                                       const isCurrentMonth = date.getMonth() === new Date().getMonth() && date.getFullYear() === new Date().getFullYear();
                                       return (
                                           <div key={dateKey} className="flex items-center justify-between p-2 bg-slate-100/50 dark:bg-slate-700/50 rounded-lg">
-                                              <span className={`text-slate-600 dark:text-slate-300 capitalize text-sm font-medium ${isCurrentMonth ? theme.text : ''}`}>
-                                                {monthName} {isCurrentMonth && '(Actual)'}
+                                              <span className={`text-slate-600 dark:text-slate-300 capitalize text-sm font-medium`}>
+                                                {monthName}
+                                                {isCurrentMonth ? ' (Actual)' : <span className="text-red-500 ml-1">*</span>}
                                               </span>
                                               <input 
                                                 type="number" 
@@ -390,7 +426,7 @@ const Welcome: React.FC<WelcomeProps> = ({
                       <h2 className={`text-3xl font-bold ${isFinalFeatureSlide ? 'text-white' : 'text-slate-900 dark:text-white'} mb-3 tracking-tight`}>{slide.title}</h2>
                       <p className={`${isFinalFeatureSlide ? 'text-slate-200' : 'text-slate-600 dark:text-slate-400'} max-w-sm leading-relaxed`}>
                         {(() => {
-                          // FIX: The type of slide.description is a union that includes a function, which is not a valid ReactNode.
+                          // The type of slide.description is a union that includes a function, which is not a valid ReactNode.
                           // This IIFE correctly calls the function if it exists, ensuring a valid ReactNode is always returned for rendering, resolving a TypeScript type inference issue.
                           if (typeof slide.description === 'function') {
                             return slide.description(setupData.name);
@@ -421,7 +457,8 @@ const Welcome: React.FC<WelcomeProps> = ({
 
         <button
           onClick={handleNext}
-          className={`w-full max-w-sm mx-auto py-3 rounded-lg font-bold text-lg transition-all ${getButtonClass()}`}
+          disabled={isButtonDisabled}
+          className={`w-full max-w-sm mx-auto py-3 rounded-lg font-bold text-lg transition-all ${getButtonClass()} ${isButtonDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           {buttonText}
         </button>

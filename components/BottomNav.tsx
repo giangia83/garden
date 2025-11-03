@@ -1,10 +1,10 @@
+
 import React from 'react';
 import { PlusIcon } from './icons/PlusIcon';
 import { CalendarIcon } from './icons/CalendarIcon';
 import { HomeIcon } from './icons/HomeIcon';
 import { ListBulletIcon } from './icons/ListBulletIcon';
 import { GardenIcon } from './icons/GardenIcon';
-// FIX: Correctly import types from the dedicated types file.
 import { ThemeColor } from '../types';
 import { THEMES } from '../constants';
 

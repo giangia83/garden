@@ -1,5 +1,5 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-// FIX: Correctly import types from the dedicated types file.
 import { ThemeColor, Shape } from '../types';
 import { THEMES } from '../constants';
 

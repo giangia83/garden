@@ -1,5 +1,5 @@
+
 import React, { useState, useEffect } from 'react';
-// FIX: Correctly import types from the dedicated types file.
 import { ThemeColor, Shape, ThemeMode } from '../types';
 import { THEME_LIST, THEMES } from '../constants';
 import { UserIcon } from './icons/UserIcon';

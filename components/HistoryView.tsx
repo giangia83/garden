@@ -2,12 +2,13 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { HistoryLog, ThemeColor, WeatherCondition, DayEntry, ActivityItem } from '../types';
 import { THEMES } from '../constants';
 import CalendarGrid from './CalendarGrid';
-import { getServiceYear, getServiceYearMonths, hoursToHHMM } from '../utils';
+import { getServiceYear, getServiceYearMonths, hoursToHHMM, getCommemorationDate } from '../utils';
 import { ChevronLeftIcon } from './icons/ChevronLeftIcon';
 import { ChevronRightIcon } from './icons/ChevronRightIcon';
 import { SunIcon } from './icons/SunIcon';
 import { CloudIcon } from './icons/CloudIcon';
 import { RainIcon } from './icons/RainIcon';
+import { InformationCircleIcon } from './icons/InformationCircleIcon';
 
 interface HistoryViewProps {
   archives: Record<string, HistoryLog>;
@@ -53,13 +54,18 @@ const HistoryView: React.FC<HistoryViewProps> = ({ archives, currentServiceYear,
 
   const historyForSelectedYear = archives[selectedYear] || {};
   
+  const isSummaryMonth = useMemo(() => {
+    const monthKey = `${selectedMonthDate.getFullYear()}-${String(selectedMonthDate.getMonth() + 1).padStart(2, '0')}-SUMMARY`;
+    return historyForSelectedYear[monthKey]?.isSummary === true;
+  }, [historyForSelectedYear, selectedMonthDate]);
+  
   const weatherCounts = useMemo(() => {
     const counts: Record<WeatherCondition, number> = { sunny: 0, cloudy: 0, bad: 0 };
+    if (isSummaryMonth) return counts;
+
     const year = selectedMonthDate.getFullYear();
     const month = selectedMonthDate.getMonth();
-
-    // FIX: Refactor loop to use Object.keys for better type inference and add a runtime check
-    // to prevent errors from potentially malformed 'entry' data (e.g., a number instead of an object).
+    
     Object.keys(historyForSelectedYear).forEach(dateKey => {
         const entry = historyForSelectedYear[dateKey];
         const entryDate = new Date(dateKey);
@@ -70,7 +76,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ archives, currentServiceYear,
         }
     });
     return counts;
-  }, [historyForSelectedYear, selectedMonthDate]);
+  }, [historyForSelectedYear, selectedMonthDate, isSummaryMonth]);
 
 
   const handlePrevMonth = () => {
@@ -80,6 +86,10 @@ const HistoryView: React.FC<HistoryViewProps> = ({ archives, currentServiceYear,
   const handleNextMonth = () => {
     setCurrentMonthIndex(prev => (prev < serviceYearMonths.length - 1 ? prev + 1 : 0));
   };
+  
+  const commemorationDate = useMemo(() => {
+    return getCommemorationDate(selectedYear);
+  }, [selectedYear]);
   
   return (
     <div className="w-full max-w-4xl mx-auto">
@@ -117,6 +127,13 @@ const HistoryView: React.FC<HistoryViewProps> = ({ archives, currentServiceYear,
             <ChevronRightIcon className="w-6 h-6 text-slate-500" />
           </button>
         </div>
+        
+        {isSummaryMonth && (
+            <div className="mb-4 text-center text-sm bg-slate-100 dark:bg-slate-700/50 p-3 rounded-lg flex items-center justify-center gap-2">
+                <InformationCircleIcon className="w-5 h-5 text-slate-500" />
+                <span>Este es un resumen. El historial por día está disponible para los meses registrados en la app.</span>
+            </div>
+        )}
 
         <CalendarGrid 
             selectedMonth={selectedMonthDate}
@@ -125,6 +142,8 @@ const HistoryView: React.FC<HistoryViewProps> = ({ archives, currentServiceYear,
             themeColor={themeColor}
             isPrivacyMode={isPrivacyMode}
             activities={activities}
+            isSummaryMonth={isSummaryMonth}
+            commemorationDate={commemorationDate}
         />
       </div>
 

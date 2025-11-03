@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { ThemeColor } from '../types';
 import { THEMES } from '../constants';
@@ -7,7 +8,6 @@ import { PauseIcon } from './icons/PauseIcon';
 import { StopIcon } from './icons/StopIcon';
 import { RefreshIcon } from './icons/RefreshIcon';
 
-// FIX: Define NotificationAction type to resolve TypeScript error.
 // The built-in type might not be available in the current environment.
 interface NotificationAction {
   action: string;
@@ -81,7 +81,7 @@ const Timer: React.FC<TimerProps> = ({
   const showNotification = (body: string, requireInteraction = false, actions: NotificationAction[] = []) => {
     if (notificationPermission !== 'granted') return;
     navigator.serviceWorker.ready.then(registration => {
-      // FIX: Cast notification options to 'any' to allow the 'actions' property,
+      // Cast notification options to 'any' to allow the 'actions' property,
       // which might not be present in the environment's NotificationOptions type definition.
       registration.showNotification('Garden Service Tracker', {
         body,

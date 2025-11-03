@@ -131,3 +131,21 @@ export const getServiceYearMonths = (date: Date): Date[] => {
   }
   return months;
 };
+
+/**
+ * Gets the date of the Commemoration for a given service year.
+ * Dates are hardcoded for reliability.
+ * @param serviceYear - The service year string (e.g., "2023-2024").
+ * @returns A Date object for the Commemoration, or null if not found.
+ */
+export const getCommemorationDate = (serviceYear: string): Date | null => {
+    const commemorationDates: Record<string, string> = {
+        '2023-2024': '2024-03-24', // March 24, 2024
+        '2024-2025': '2025-04-12', // April 12, 2025
+        '2025-2026': '2026-04-02', // April 2, 2026
+    };
+    const dateStr = commemorationDates[serviceYear];
+    if (!dateStr) return null;
+    // Add T12:00:00Z to avoid timezone issues where the date could be off by one.
+    return new Date(dateStr + 'T12:00:00Z'); 
+};

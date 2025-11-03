@@ -2,12 +2,13 @@ import React from 'react';
 import ShapeProgress from './FlowerProgress';
 import Timer from './Timer';
 import PaceTracker from './PaceTracker';
-import { ThemeColor, Shape } from '../types';
+import { ThemeColor, Shape, HistoryLog } from '../types';
 import { THEMES } from '../constants';
 import { SettingsIcon } from './icons/SettingsIcon';
 import { HelpIcon } from './icons/HelpIcon';
 import { EyeIcon } from './icons/EyeIcon';
 import { EyeSlashIcon } from './icons/EyeSlashIcon';
+import { GhostIcon } from './icons/GhostIcon';
 import { hoursToHHMM } from '../utils';
 
 interface ServiceTrackerProps {
@@ -25,6 +26,9 @@ interface ServiceTrackerProps {
   performanceMode: boolean;
   isPrivacyMode: boolean;
   onTogglePrivacyMode: () => void;
+  isGhostMode: boolean;
+  onToggleGhostMode: () => void;
+  previousMonthHistory: HistoryLog;
 }
 
 const ServiceTracker: React.FC<ServiceTrackerProps> = ({ 
@@ -42,6 +46,9 @@ const ServiceTracker: React.FC<ServiceTrackerProps> = ({
   performanceMode,
   isPrivacyMode,
   onTogglePrivacyMode,
+  isGhostMode,
+  onToggleGhostMode,
+  previousMonthHistory,
 }) => {
   const theme = THEMES[themeColor] || THEMES.blue;
   
@@ -57,13 +64,21 @@ const ServiceTracker: React.FC<ServiceTrackerProps> = ({
   return (
     <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-200/50 dark:border-slate-700/50 w-full max-w-2xl mx-auto">
       <div className="grid grid-cols-3 items-center mb-2">
-        <div className="flex justify-start">
+        <div className="flex justify-start items-center space-x-1">
           <button 
             onClick={onTogglePrivacyMode}
             className="p-2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
             aria-label={isPrivacyMode ? "Mostrar horas" : "Ocultar horas"}
           >
             {isPrivacyMode ? <EyeSlashIcon className="w-6 h-6" /> : <EyeIcon className="w-6 h-6" />}
+          </button>
+          <button 
+            id="ghost-mode-toggle"
+            onClick={onToggleGhostMode}
+            className={`p-2 rounded-full transition-colors ${isGhostMode ? theme.text + ' ' + theme.bg + ' bg-opacity-10' : 'text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700/50'}`}
+            aria-label={isGhostMode ? "Ocultar ritmo del mes pasado" : "Mostrar ritmo del mes pasado"}
+          >
+            <GhostIcon className="w-6 h-6" />
           </button>
         </div>
         <p className="text-center text-sm font-semibold text-slate-500 dark:text-slate-400">Meta: {isPrivacyMode ? '**' : goal} hrs</p>
@@ -112,6 +127,8 @@ const ServiceTracker: React.FC<ServiceTrackerProps> = ({
             currentDate={currentDate}
             themeColor={themeColor}
             isPrivacyMode={isPrivacyMode}
+            isGhostMode={isGhostMode}
+            previousMonthHistory={previousMonthHistory}
           />
         </div>
         

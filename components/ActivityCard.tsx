@@ -1,6 +1,6 @@
 
+
 import React from 'react';
-// FIX: Correctly import types from the dedicated types file.
 import { ActivityItem, ThemeColor } from '../types';
 import { THEMES } from '../constants';
 import { UserIcon } from './icons/UserIcon';
