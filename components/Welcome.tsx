@@ -262,7 +262,7 @@ const RoleButton: React.FC<{label: string, value: UserRole, current: UserRole, o
     <button
         type="button"
         onClick={() => onClick(value)}
-        className={`w-full p-3 rounded-lg text-sm font-semibold transition-colors border-2 ${current === value ? `${theme.bg} text-white border-transparent` : 'bg-white dark:bg-slate-700/50 border-slate-300 dark:border-slate-600'}`}
+        className={`w-full p-3 rounded-lg text-sm font-semibold transition-colors border-2 ${current === value ? `${theme.bg} text-white border-transparent` : 'bg-white text-slate-700 border-slate-300 dark:bg-slate-700/50 dark:text-slate-300 dark:border-slate-600'}`}
     >
         {label}
     </button>
@@ -574,7 +574,7 @@ const Welcome: React.FC<WelcomeProps> = ({
                        {slide.title === "Horas de este mes" && (
                          <div>
                             <label className={`text-sm font-medium ${subTextColor}`}>{`¿Cuántas horas has hecho hasta hoy en el mes actual?${role === 'publisher' ? ' (Opcional)' : ''}`}</label>
-                             <input type="text" value={currentMonthHours} onChange={(e) => setCurrentMonthHours(e.target.value)} placeholder="Ej: 15.5 o 15:30" className={`w-full mt-2 p-3 text-center text-xl ${inputBgColor} border ${inputBorderColor} rounded-lg focus:ring-2 ${displayTheme.ring} outline-none transition`} inputMode="decimal" />
+                             <input type="text" value={currentMonthHours} onChange={(e) => setCurrentMonthHours(e.target.value)} placeholder="Ej: 15.5 o 15:30" className={`w-full mt-2 p-3 text-center text-xl ${mainTextColor} ${inputBgColor} border ${inputBorderColor} rounded-lg focus:ring-2 ${displayTheme.ring} outline-none transition`} inputMode="decimal" />
                          </div>
                       )}
                       {slide.title === "Horas del año de servicio" && (
@@ -590,7 +590,7 @@ const Welcome: React.FC<WelcomeProps> = ({
                                 return (
                                     <div key={dateKey} className={`flex items-center justify-between p-2 ${isEffectiveLight ? 'bg-slate-500/10' : 'bg-slate-800/50'} rounded-lg`}>
                                         <span className={`${subTextColor} capitalize text-sm font-medium`}>{monthName}</span>
-                                        <input type="number" placeholder="0" onChange={(e) => handleHoursChange(dateKey, e.target.value)} className={`w-24 px-2 py-1 ${isEffectiveLight ? 'bg-slate-200' : 'bg-slate-700/80'} border ${inputBorderColor} rounded-lg text-right focus:ring-2 ${displayTheme.ring} outline-none transition`} inputMode="decimal" step="0.1" />
+                                        <input type="number" placeholder="0" onChange={(e) => handleHoursChange(dateKey, e.target.value)} className={`w-24 px-2 py-1 ${mainTextColor} ${isEffectiveLight ? 'bg-slate-200' : 'bg-slate-700/80'} border ${inputBorderColor} rounded-lg text-right focus:ring-2 ${displayTheme.ring} outline-none transition`} inputMode="decimal" step="0.1" />
                                     </div>
                                 )
                             })}
@@ -602,7 +602,7 @@ const Welcome: React.FC<WelcomeProps> = ({
                             <label className={`text-sm font-medium ${subTextColor}`}>Tu nombre</label>
                             <div className="relative mt-1">
                                 <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                                <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={`w-full pl-10 pr-4 py-2 ${inputBgColor} border ${inputBorderColor} rounded-lg focus:ring-2 ${displayTheme.ring} outline-none transition`} />
+                                <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={`w-full pl-10 pr-4 py-2 ${mainTextColor} ${inputBgColor} border ${inputBorderColor} rounded-lg focus:ring-2 ${displayTheme.ring} outline-none transition`} />
                             </div>
                         </div>
                       )}

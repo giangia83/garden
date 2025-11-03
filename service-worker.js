@@ -1,17 +1,29 @@
-const CACHE_NAME = 'garden-cache-v1';
+const CACHE_NAME = 'garden-cache-v2'; // Incrementamos la versión del caché
 // Lista completa de recursos necesarios para que la app funcione offline.
 const URLS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/index.tsx', // Asumiendo que el bundler lo sirve en esta ruta
+  '/index.tsx',
+  '/App.tsx',
+  '/types.ts',
+  '/constants.ts',
+  '/utils.ts',
+  '/hooks/useOnlineStatus.ts',
   '/assets/icon-192x192.svg',
   '/assets/icon-512x512.svg',
+  // CDN de Tailwind
   'https://cdn.tailwindcss.com',
+  // CDNs de React y GenAI
   'https://aistudiocdn.com/react@^19.2.0',
   'https://aistudiocdn.com/react-dom@^19.2.0/client',
   'https://aistudiocdn.com/react-dom@^19.2.0/',
-  'https://aistudiocdn.com/react@^19.2.0/'
+  'https://aistudiocdn.com/react@^19.2.0/',
+  'https://aistudiocdn.com/@google/genai@^1.28.0',
+  // Google Fonts
+  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Pacifico&display=swap',
+  'https://fonts.gstatic.com/s/inter/v13/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa2JL7W0Q5n-wU.woff2',
+  'https://fonts.gstatic.com/s/pacifico/v22/FwZY7-Qmy14u9lezJ-6H6MmBp0u-zK4.woff2'
 ];
 
 const APP_STORAGE_KEY = 'garden-service-tracker';
@@ -24,15 +36,50 @@ const REMINDER_NOTIFICATION_TAG = 'garden-daily-reminder';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(URLS_TO_CACHE))
+    caches.open(CACHE_NAME).then((cache) => {
+      console.log('Opened cache and caching URLs');
+      // Usamos addAll que es atómico. Si una falla, fallan todas.
+      // Para recursos de terceros, es mejor usar `cache.add` individualmente
+      // en un Promise.all para más control, pero esto es más simple.
+      return cache.addAll(URLS_TO_CACHE);
+    })
   );
 });
 
 self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request).then((response) => response || fetch(event.request))
-  );
+    // Solo manejamos peticiones GET
+    if (event.request.method !== 'GET') {
+        return;
+    }
+  
+    event.respondWith(
+        caches.open(CACHE_NAME).then(async (cache) => {
+            // 1. Intenta obtener la respuesta desde el caché
+            const cachedResponse = await cache.match(event.request);
+            if (cachedResponse) {
+                return cachedResponse;
+            }
+
+            // 2. Si no está en caché, ve a la red
+            try {
+                const networkResponse = await fetch(event.request);
+                // Si la respuesta es válida, la clonamos y la guardamos en el caché
+                if (networkResponse && networkResponse.status === 200) {
+                    // Cacheamos solo si es una URL que esperamos
+                    if (URLS_TO_CACHE.some(url => event.request.url.startsWith(url.split('?')[0]))) {
+                        await cache.put(event.request, networkResponse.clone());
+                    }
+                }
+                return networkResponse;
+            } catch (error) {
+                // Si la red falla, no podemos hacer nada más.
+                // Podríamos devolver una página de fallback offline aquí si quisiéramos.
+                console.error('Fetch failed; returning offline fallback page or error.', error);
+            }
+        })
+    );
 });
+
 
 self.addEventListener('activate', (event) => {
   const cacheWhitelist = [CACHE_NAME];
@@ -41,6 +88,7 @@ self.addEventListener('activate', (event) => {
       Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
+            console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -106,11 +154,25 @@ self.addEventListener('notificationclick', (event) => {
               return `${year}-${month}-${day}`;
             };
             
-            const dateKey = formatDateKey(new Date());
+            const getServiceYear = (date) => {
+                const year = date.getFullYear();
+                const month = date.getMonth();
+                const startYear = month >= 8 ? year : year - 1;
+                return `${startYear}-${startYear + 1}`;
+            };
+            
+            const today = new Date();
+            const serviceYear = getServiceYear(today);
+            const dateKey = formatDateKey(today);
             
             appState.currentHours = (appState.currentHours || 0) + hoursToAdd;
-            appState.history = appState.history || {};
-            appState.history[dateKey] = (appState.history[dateKey] || 0) + hoursToAdd;
+            
+            if (!appState.archives) appState.archives = {};
+            if (!appState.archives[serviceYear]) appState.archives[serviceYear] = {};
+            
+            const oldEntry = appState.archives[serviceYear][dateKey] || { hours: 0 };
+            oldEntry.hours = (oldEntry.hours || 0) + hoursToAdd;
+            appState.archives[serviceYear][dateKey] = oldEntry;
             
             localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(appState));
           } catch(e) {
