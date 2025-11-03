@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
@@ -29,7 +28,6 @@ const TUTORIALS_SEEN_KEY = 'garden-tutorials-seen';
 const TUTORIAL_AGREEMENT_KEY = 'garden-tutorial-agreement';
 const SETTINGS_KEY = 'garden-settings';
 const PRIVACY_MODE_KEY = 'garden-privacy-mode';
-// FIX: Define REMINDER_LAST_SENT_KEY constant
 const REMINDER_LAST_SENT_KEY = 'garden-reminder-last-sent';
 
 type AppView = 'tracker' | 'activity' | 'history';
@@ -120,6 +118,7 @@ const getInitialState = (): AppState | null => {
 
     if (!parsed.activities) parsed.activities = [];
     if (!parsed.groupArrangements) parsed.groupArrangements = [];
+    if (!parsed.currentLdcHours) parsed.currentLdcHours = 0;
 
     return parsed;
   } catch (e) {
@@ -171,6 +170,7 @@ const App: React.FC = () => {
   const validatedThemeMode = initialThemeMode && validThemeModes.includes(initialThemeMode) ? initialThemeMode : 'dark';
 
   const [currentHours, setCurrentHours] = useState(initialState?.currentHours ?? 0);
+  const [currentLdcHours, setCurrentLdcHours] = useState(initialState?.currentLdcHours ?? 0);
   const [userName, setUserName] = useState(initialState?.userName ?? 'Precursor');
   const [goal, setGoal] = useState(initialState?.goal ?? 50);
   const [currentDate, setCurrentDate] = useState(initialState?.currentDate ? new Date(initialState.currentDate) : new Date());
@@ -194,6 +194,7 @@ const App: React.FC = () => {
   const [isAddHoursModalOpen, setAddHoursModalOpen] = useState(false);
   const [isStreakModalOpen, setIsStreakModalOpen] = useState(false);
   const [isEditTotalHoursMode, setIsEditTotalHoursMode] = useState(false);
+  const [isEditLdcHoursMode, setIsEditLdcHoursMode] = useState(false);
   const [dateToEdit, setDateToEdit] = useState<Date | null>(null);
   const [isGoalReachedModalOpen, setGoalReachedModalOpen] = useState(false);
   const [isEndOfYearModalOpen, setEndOfYearModalOpen] = useState(false);
@@ -393,6 +394,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const stateToSave: AppState = {
       currentHours,
+      currentLdcHours,
       userName,
       goal,
       currentDate: currentDate.toISOString(),
@@ -410,7 +412,7 @@ const App: React.FC = () => {
       protectedDay,
     };
     localStorage.setItem(APP_STORAGE_key, JSON.stringify(stateToSave));
-  }, [currentHours, userName, goal, currentDate, progressShape, themeColor, themeMode, archives, currentServiceYear, activities, groupArrangements, streak, lastLogDate, streakRestores, lastRestoreMonth, protectedDay]);
+  }, [currentHours, currentLdcHours, userName, goal, currentDate, progressShape, themeColor, themeMode, archives, currentServiceYear, activities, groupArrangements, streak, lastLogDate, streakRestores, lastRestoreMonth, protectedDay]);
   
   useEffect(() => {
     localStorage.setItem(PRIVACY_MODE_KEY, String(isPrivacyMode));
@@ -475,6 +477,7 @@ const App: React.FC = () => {
         const yearHistory = { ...(newArchives[currentServiceYear] || {}) };
         const oldEntry = yearHistory[dateKey] || { hours: 0 };
         yearHistory[dateKey] = {
+            ...oldEntry,
             hours: oldEntry.hours + hoursToAdd,
             weather: weather || oldEntry.weather, // Keep old weather if new one isn't provided
         };
@@ -488,6 +491,24 @@ const App: React.FC = () => {
 
     setCurrentHours(newHours);
     updateStreak();
+    setAddHoursModalOpen(false);
+  };
+
+  const handleAddLdcHours = (ldcHoursToAdd: number) => {
+    if (ldcHoursToAdd <= 0) return;
+    const dateKey = formatDateKey(new Date());
+    setArchives(prev => {
+        const newArchives = { ...prev };
+        const yearHistory = { ...(newArchives[currentServiceYear] || {}) };
+        const oldEntry: DayEntry = yearHistory[dateKey] || { hours: 0 };
+        yearHistory[dateKey] = {
+            ...oldEntry,
+            ldcHours: (oldEntry.ldcHours || 0) + ldcHoursToAdd,
+        };
+        newArchives[currentServiceYear] = yearHistory;
+        return newArchives;
+    });
+    setCurrentLdcHours(prev => prev + ldcHoursToAdd);
     setAddHoursModalOpen(false);
   };
 
@@ -510,8 +531,52 @@ const App: React.FC = () => {
     
     setCurrentHours(totalHours);
     if (totalHours > 0) updateStreak();
-    setAddHoursModalOpen(false);
+    handleCloseModal();
   }
+  
+  const handleSetLdcHours = (totalLdcHours: number) => {
+    const difference = totalLdcHours - currentLdcHours;
+    const dateKey = formatDateKey(currentDate);
+
+    if (difference !== 0) {
+        setArchives(prev => {
+            const newArchives = { ...prev };
+            const yearHistory = { ...(newArchives[currentServiceYear] || {}) };
+            const oldEntry: DayEntry = yearHistory[dateKey] || { hours: 0 };
+            yearHistory[dateKey] = { 
+                ...oldEntry, 
+                ldcHours: (oldEntry.ldcHours || 0) + difference 
+            };
+            newArchives[currentServiceYear] = yearHistory;
+            return newArchives;
+        });
+    }
+    setCurrentLdcHours(totalLdcHours);
+    handleCloseModal();
+  };
+  
+  const handleDeleteLdcHours = () => {
+    setArchives(prev => {
+        const newArchives = { ...prev };
+        const yearHistory = { ...(newArchives[currentServiceYear] || {}) };
+        const today = currentDate;
+        const currentMonth = today.getMonth();
+        const currentYear = today.getFullYear();
+
+        for (const key in yearHistory) {
+            const entryDate = new Date(key);
+            if (entryDate.getFullYear() === currentYear && entryDate.getMonth() === currentMonth) {
+                if (yearHistory[key].ldcHours) {
+                    delete yearHistory[key].ldcHours;
+                }
+            }
+        }
+        newArchives[currentServiceYear] = yearHistory;
+        return newArchives;
+    });
+    setCurrentLdcHours(0);
+    handleCloseModal();
+  };
 
   const handleSetHoursForDate = (newTotalHours: number, date: Date, weather?: WeatherCondition, isCampaign?: boolean) => {
     const dateKey = formatDateKey(date);
@@ -524,8 +589,8 @@ const App: React.FC = () => {
       const oldEntry = yearHistory[dateKey] || { hours: 0 };
       
       const newEntry: DayEntry = {
+          ...oldEntry,
           hours: newTotalHours,
-          status: oldEntry.status, // Preserve status
           weather: weather || oldEntry.weather, // Keep old weather if not specified
       };
       
@@ -537,17 +602,25 @@ const App: React.FC = () => {
       
       if(newEntry.status === 'sick') newEntry.hours = 0;
 
-      if (newEntry.hours > 0 || newEntry.weather || newEntry.status || newEntry.isCampaign) {
+      if (newEntry.hours > 0 || newEntry.weather || newEntry.status || newEntry.isCampaign || (newEntry.ldcHours && newEntry.ldcHours > 0)) {
         yearHistory[dateKey] = newEntry;
       } else {
         delete yearHistory[dateKey];
       }
       newArchives[serviceYear] = yearHistory;
 
+      // Recalculate current month total
       const today = currentDate;
       if (date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth()) {
-        const difference = newTotalHours - oldEntry.hours;
-        setCurrentHours(h => Math.max(0, h + difference));
+        const currentMonthHistory = newArchives[getServiceYear(today)];
+        let total = 0;
+        for (const key in currentMonthHistory) {
+          const entryDate = new Date(key);
+          if (entryDate.getFullYear() === today.getFullYear() && entryDate.getMonth() === today.getMonth()) {
+            total += currentMonthHistory[key].hours || 0;
+          }
+        }
+        setCurrentHours(total);
       }
 
       return newArchives;
@@ -564,6 +637,44 @@ const App: React.FC = () => {
     }
     handleCloseModal();
   };
+
+  const handleSetLdcHoursForDate = (ldcHours: number, date: Date) => {
+    const dateKey = formatDateKey(date);
+    const serviceYear = getServiceYear(date);
+
+    setArchives(prev => {
+      const newArchives = { ...prev };
+      if (!newArchives[serviceYear]) newArchives[serviceYear] = {};
+      const yearHistory = { ...newArchives[serviceYear] };
+      const oldEntry = yearHistory[dateKey] || { hours: 0 };
+      
+      const newEntry: DayEntry = { ...oldEntry, ldcHours: ldcHours };
+      
+      if (newEntry.hours > 0 || newEntry.weather || newEntry.status || newEntry.isCampaign || (newEntry.ldcHours && newEntry.ldcHours > 0)) {
+        yearHistory[dateKey] = newEntry;
+      } else {
+        delete yearHistory[dateKey];
+      }
+      newArchives[serviceYear] = yearHistory;
+      
+      // Recalculate current month LDC total
+      const today = currentDate;
+      if (date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth()) {
+        const currentMonthHistory = newArchives[getServiceYear(today)];
+        let total = 0;
+        for (const key in currentMonthHistory) {
+          const entryDate = new Date(key);
+          if (entryDate.getFullYear() === today.getFullYear() && entryDate.getMonth() === today.getMonth()) {
+            total += currentMonthHistory[key].ldcHours || 0;
+          }
+        }
+        setCurrentLdcHours(total);
+      }
+
+      return newArchives;
+    });
+    handleCloseModal();
+  };
   
   const handleMarkDayStatus = (date: Date, status: DayStatus | null) => {
     const dateKey = formatDateKey(date);
@@ -574,18 +685,18 @@ const App: React.FC = () => {
         if (!newArchives[serviceYear]) newArchives[serviceYear] = {};
         const yearHistory = { ...(newArchives[serviceYear]) };
         const oldEntry = yearHistory[dateKey] || { hours: 0 };
-        const oldHours = oldEntry.hours || 0;
         
         const newEntry: DayEntry = { ...oldEntry };
 
         if (status) { // Setting a status
             newEntry.status = status;
-            newEntry.hours = 0; // Sick days have 0 hours
+            newEntry.hours = 0;
+            newEntry.ldcHours = 0;
         } else { // Clearing a status
             delete newEntry.status;
         }
 
-        if (newEntry.hours > 0 || newEntry.weather || newEntry.status || newEntry.isCampaign) {
+        if (newEntry.hours > 0 || newEntry.weather || newEntry.status || newEntry.isCampaign || (newEntry.ldcHours && newEntry.ldcHours > 0)) {
             yearHistory[dateKey] = newEntry;
         } else {
             delete yearHistory[dateKey];
@@ -593,12 +704,21 @@ const App: React.FC = () => {
         
         newArchives[serviceYear] = yearHistory;
 
-        // Update current month total if status change affected hours
+        // Update current month totals if status change affected hours
         const today = currentDate;
         if (date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth()) {
-            if (status === 'sick' && oldHours > 0) {
-                setCurrentHours(h => Math.max(0, h - oldHours));
+            const currentMonthHistory = newArchives[getServiceYear(today)];
+            let totalService = 0;
+            let totalLdc = 0;
+            for (const key in currentMonthHistory) {
+              const entryDate = new Date(key);
+              if (entryDate.getFullYear() === today.getFullYear() && entryDate.getMonth() === today.getMonth()) {
+                totalService += currentMonthHistory[key].hours || 0;
+                totalLdc += currentMonthHistory[key].ldcHours || 0;
+              }
             }
+            setCurrentHours(totalService);
+            setCurrentLdcHours(totalLdc);
         }
         
         return newArchives;
@@ -610,6 +730,8 @@ const App: React.FC = () => {
     setAddHoursModalOpen(false);
     setActivityToEdit(null);
     setDateToEdit(null);
+    setIsEditTotalHoursMode(false);
+    setIsEditLdcHoursMode(false);
   };
 
   const handleSaveActivity = (data: Omit<ActivityItem, 'id' | 'date'> & { recurring?: boolean }) => {
@@ -653,6 +775,13 @@ const App: React.FC = () => {
   const openEditModal = () => {
     setActivityToEdit(null);
     setIsEditTotalHoursMode(true);
+    setDateToEdit(null);
+    setAddHoursModalOpen(true);
+  };
+  
+  const openEditLdcModal = () => {
+    setActivityToEdit(null);
+    setIsEditLdcHoursMode(true);
     setDateToEdit(null);
     setAddHoursModalOpen(true);
   };
@@ -731,6 +860,7 @@ const App: React.FC = () => {
     
     setCurrentServiceYear(newServiceYear);
     setCurrentHours(0);
+    setCurrentLdcHours(0);
     setArchives(prev => ({ ...prev, [newServiceYear]: {} }));
     
     setEndOfYearModalOpen(false);
@@ -794,6 +924,7 @@ const App: React.FC = () => {
         setArchives(importedState.archives);
         setCurrentServiceYear(importedState.currentServiceYear);
         setCurrentHours(importedState.currentHours);
+        setCurrentLdcHours(importedState.currentLdcHours || 0);
         setActivities(importedState.activities);
         setGroupArrangements(importedState.groupArrangements);
         setStreak(importedState.streak);
@@ -847,10 +978,12 @@ const App: React.FC = () => {
         return (
           <>
             <ServiceTracker 
-              currentHours={currentHours} 
+              currentHours={currentHours}
+              currentLdcHours={currentLdcHours}
               goal={goal}
               currentDate={currentDate}
               onEditClick={openEditModal} 
+              onEditLdcClick={openEditLdcModal}
               onAddHours={handleAddHours}
               progressShape={progressShape}
               themeColor={themeColor}
@@ -950,15 +1083,21 @@ const App: React.FC = () => {
         isOpen={isAddHoursModalOpen}
         onClose={handleCloseModal}
         onAddHours={handleAddHours}
+        onAddLdcHours={handleAddLdcHours}
         onSetHours={handleSetHours}
+        onSetLdcHours={handleSetLdcHours}
+        onDeleteLdcHours={handleDeleteLdcHours}
         onSaveActivity={handleSaveActivity}
         activityToEdit={activityToEdit}
         currentHours={currentHours}
+        currentLdcHours={currentLdcHours}
         isEditMode={isEditTotalHoursMode}
+        isEditLdcMode={isEditLdcHoursMode}
         themeColor={themeColor}
         performanceMode={performanceMode}
         dateForEntry={dateToEdit}
         onSetHoursForDate={handleSetHoursForDate}
+        onSetLdcHoursForDate={handleSetLdcHoursForDate}
         onMarkDayStatus={handleMarkDayStatus}
         archives={archives}
         activities={activities}

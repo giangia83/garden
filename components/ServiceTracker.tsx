@@ -13,9 +13,11 @@ import { hoursToHHMM } from '../utils';
 
 interface ServiceTrackerProps {
   currentHours: number;
+  currentLdcHours: number;
   goal: number;
   currentDate: Date;
   onEditClick: () => void;
+  onEditLdcClick: () => void;
   onAddHours: (hours: number) => void;
   progressShape: Shape;
   themeColor: ThemeColor;
@@ -33,9 +35,11 @@ interface ServiceTrackerProps {
 
 const ServiceTracker: React.FC<ServiceTrackerProps> = ({ 
   currentHours, 
+  currentLdcHours,
   goal,
   currentDate,
   onEditClick, 
+  onEditLdcClick,
   onAddHours, 
   progressShape, 
   themeColor,
@@ -93,20 +97,32 @@ const ServiceTracker: React.FC<ServiceTrackerProps> = ({
       </div>
       
       <div className="flex flex-col items-center">
-        <div id="progress-display-container" className="relative w-48 h-48 md:w-56 md:h-56 flex items-center justify-center mb-4">
-          <ShapeProgress progress={percentage / 100} shape={progressShape} themeColor={themeColor} isPrivacyMode={isPrivacyMode} />
-          <button 
-            onClick={onEditClick}
-            className="absolute inset-0 flex flex-col items-center justify-center text-center cursor-pointer group rounded-full"
-            aria-label="Editar horas totales"
-          >
-            <div className="transition-transform group-hover:scale-105">
-              <p className={`${textSizeClass} font-bold text-slate-800 dark:text-slate-100 tracking-tight transition-all ${privacyBlur}`}>
-                {isPrivacyMode ? '**:**' : hoursToHHMM(currentHours)}
-              </p>
-              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Horas</p>
+        <div className="flex items-center justify-center gap-4 mb-4">
+            <div id="progress-display-container" className="relative w-48 h-48 md:w-56 md:h-56 flex items-center justify-center">
+              <ShapeProgress progress={percentage / 100} shape={progressShape} themeColor={themeColor} isPrivacyMode={isPrivacyMode} />
+              <button 
+                onClick={onEditClick}
+                className="absolute inset-0 flex flex-col items-center justify-center text-center cursor-pointer group rounded-full"
+                aria-label="Editar horas totales"
+              >
+                <div className="transition-transform group-hover:scale-105">
+                  <p className={`${textSizeClass} font-bold text-slate-800 dark:text-slate-100 tracking-tight transition-all ${privacyBlur}`}>
+                    {isPrivacyMode ? '**:**' : hoursToHHMM(currentHours)}
+                  </p>
+                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Horas</p>
+                </div>
+              </button>
             </div>
-          </button>
+            {!isPrivacyMode && currentLdcHours > 0 && (
+                <button onClick={onEditLdcClick} className={`flex flex-col items-center justify-center animate-fadeIn group`} aria-label="Editar horas LDC">
+                    <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-700/50 flex flex-col items-center justify-center text-center border border-slate-200 dark:border-slate-600 transition-transform group-hover:scale-105">
+                        <p className={`text-3xl font-bold text-slate-800 dark:text-slate-100 tracking-tight transition-all ${privacyBlur}`}>
+                            {isPrivacyMode ? '**:**' : hoursToHHMM(currentLdcHours)}
+                        </p>
+                    </div>
+                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-2">Horas LDC</p>
+                </button>
+            )}
         </div>
 
         <div className={`w-full grid grid-cols-2 gap-4 text-center mb-4 transition-all ${privacyBlur}`}>

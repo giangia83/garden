@@ -49,9 +49,13 @@ const PaceTracker: React.FC<PaceTrackerProps> = ({
     let cumulativeGhostHours = 0;
     for (let day = 1; day <= dayToCompare; day++) {
         const dateKey = `${prevMonthYear}-${String(prevMonthMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const entry = previousMonthHistory[dateKey] as DayEntry | undefined;
-        if (entry && typeof entry.hours === 'number') {
+        const entry = previousMonthHistory[dateKey];
+        
+        if (typeof entry === 'object' && entry !== null && typeof entry.hours === 'number') {
             cumulativeGhostHours += entry.hours;
+        } else if (typeof entry === 'number') {
+            // Handle legacy data format
+            cumulativeGhostHours += entry;
         }
     }
     

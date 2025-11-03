@@ -1,8 +1,10 @@
+
 import React, { useMemo } from 'react';
 import { HistoryLog, ThemeColor, DayEntry, ActivityItem } from '../types';
 import { THEMES } from '../constants';
 import { hoursToHHMM } from '../utils';
 import { BookOpenIcon } from './icons/BookOpenIcon';
+import { BuildingOfficeIcon } from './icons/BuildingOfficeIcon';
 
 interface CalendarGridProps {
   selectedMonth: Date;
@@ -124,6 +126,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
             {calendarDays.map(({ date, isCurrentMonth, dayEntry, hasActivity }, index) => {
                 const isToday = new Date().toDateString() === date.toDateString();
                 const hours = dayEntry?.hours || 0;
+                const ldcHours = dayEntry?.ldcHours || 0;
                 const status = dayEntry?.status;
                 
                 const isCommemoration = commemorationDate && 
@@ -178,15 +181,27 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                         {hasRecurringActivity && !isSummaryMonth &&
                             <BookOpenIcon className="absolute top-1.5 left-1.5 w-4 h-4 text-slate-500 dark:text-slate-400" />
                         }
+                        {ldcHours > 0 && !isSummaryMonth &&
+                            <BuildingOfficeIcon className="absolute bottom-1.5 right-1.5 w-4 h-4 text-slate-500 dark:text-slate-400" />
+                        }
 
                         <span className={`text-sm font-semibold ${isCommemoration ? 'text-white dark:text-red-100' : isCurrentMonth ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500'}`}>
                             {date.getDate()}
                         </span>
-                        {hours > 0 && isCurrentMonth && !isSummaryMonth && (
-                            <span className={`text-xs font-bold mt-1 transition-all ${status === 'sick' ? 'text-red-800 dark:text-red-200' : 'text-green-800 dark:text-green-200'} ${privacyBlur}`}>
-                                {isPrivacyMode ? '0:00' : hoursToHHMM(hours)}
-                            </span>
-                        )}
+                        
+                        <div className={`flex flex-col items-center justify-center -mt-1 ${privacyBlur}`}>
+                            {hours > 0 && isCurrentMonth && !isSummaryMonth && (
+                                <span className={`text-xs font-bold leading-tight ${status === 'sick' ? 'text-red-800 dark:text-red-200' : 'text-green-800 dark:text-green-200'}`}>
+                                    {isPrivacyMode ? '0:00' : hoursToHHMM(hours)}
+                                </span>
+                            )}
+                            {ldcHours > 0 && isCurrentMonth && !isSummaryMonth && (
+                                <span className={`text-xs font-bold leading-tight ${theme.text}`}>
+                                    {isPrivacyMode ? '0:00' : hoursToHHMM(ldcHours)}
+                                </span>
+                            )}
+                        </div>
+
                     </button>
                 );
             })}

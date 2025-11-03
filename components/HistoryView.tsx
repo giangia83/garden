@@ -9,6 +9,7 @@ import { SunIcon } from './icons/SunIcon';
 import { CloudIcon } from './icons/CloudIcon';
 import { RainIcon } from './icons/RainIcon';
 import { InformationCircleIcon } from './icons/InformationCircleIcon';
+import { BuildingOfficeIcon } from './icons/BuildingOfficeIcon';
 
 interface HistoryViewProps {
   archives: Record<string, HistoryLog>;
@@ -19,7 +20,7 @@ interface HistoryViewProps {
   activities: ActivityItem[];
 }
 
-const WeatherStat: React.FC<{ Icon: React.FC<any>, count: number, label: string, colorClass: string }> = ({ Icon, count, label, colorClass }) => (
+const Stat: React.FC<{ Icon: React.FC<any>, count: number | string, label: string, colorClass: string }> = ({ Icon, count, label, colorClass }) => (
     <div className="flex items-center space-x-2">
         <Icon className={`w-5 h-5 ${colorClass}`} />
         <span className="font-semibold text-slate-700 dark:text-slate-200">{count}</span>
@@ -59,9 +60,10 @@ const HistoryView: React.FC<HistoryViewProps> = ({ archives, currentServiceYear,
     return historyForSelectedYear[monthKey]?.isSummary === true;
   }, [historyForSelectedYear, selectedMonthDate]);
   
-  const weatherCounts = useMemo(() => {
+  const { weatherCounts, totalLdcHours } = useMemo(() => {
     const counts: Record<WeatherCondition, number> = { sunny: 0, cloudy: 0, bad: 0 };
-    if (isSummaryMonth) return counts;
+    let ldcHours = 0;
+    if (isSummaryMonth) return { weatherCounts: counts, totalLdcHours: ldcHours };
 
     const year = selectedMonthDate.getFullYear();
     const month = selectedMonthDate.getMonth();
@@ -70,12 +72,13 @@ const HistoryView: React.FC<HistoryViewProps> = ({ archives, currentServiceYear,
         const entry = historyForSelectedYear[dateKey];
         const entryDate = new Date(dateKey);
         if (entryDate.getFullYear() === year && entryDate.getMonth() === month) {
-            if (typeof entry === 'object' && entry && entry.weather) {
-                counts[entry.weather]++;
+            if (typeof entry === 'object' && entry) {
+                if (entry.weather) counts[entry.weather]++;
+                if (entry.ldcHours) ldcHours += entry.ldcHours;
             }
         }
     });
-    return counts;
+    return { weatherCounts: counts, totalLdcHours: ldcHours };
   }, [historyForSelectedYear, selectedMonthDate, isSummaryMonth]);
 
 
@@ -149,9 +152,12 @@ const HistoryView: React.FC<HistoryViewProps> = ({ archives, currentServiceYear,
 
       <div className={`mt-4 bg-white/50 dark:bg-slate-800/50 p-3 rounded-xl transition-all ${privacyBlur}`}>
           <div className="flex justify-center items-center gap-x-4 gap-y-2 flex-wrap">
-              <WeatherStat Icon={SunIcon} count={weatherCounts.sunny} label="soleados" colorClass="text-yellow-500" />
-              <WeatherStat Icon={CloudIcon} count={weatherCounts.cloudy} label="nublados" colorClass="text-slate-500" />
-              <WeatherStat Icon={RainIcon} count={weatherCounts.bad} label="difíciles" colorClass="text-blue-500" />
+              <Stat Icon={SunIcon} count={weatherCounts.sunny} label="soleados" colorClass="text-yellow-500" />
+              <Stat Icon={CloudIcon} count={weatherCounts.cloudy} label="nublados" colorClass="text-slate-500" />
+              <Stat Icon={RainIcon} count={weatherCounts.bad} label="difíciles" colorClass="text-blue-500" />
+              {totalLdcHours > 0 && (
+                <Stat Icon={BuildingOfficeIcon} count={hoursToHHMM(totalLdcHours)} label="LDC" colorClass={theme.text} />
+              )}
           </div>
       </div>
     </div>

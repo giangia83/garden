@@ -1,4 +1,4 @@
-
+// FIX: Define ThemeColor here to break circular dependency with constants.ts
 export type ThemeColor = 'blue' | 'pink' | 'green' | 'orange' | 'purple' | 'teal' | 'indigo' | 'red';
 
 export type ThemeMode = 'light' | 'dark' | 'black';
@@ -10,6 +10,7 @@ export type WeatherCondition = 'sunny' | 'cloudy' | 'bad';
 
 export type DayEntry = {
   hours: number;
+  ldcHours?: number;
   status?: DayStatus;
   weather?: WeatherCondition;
   isSummary?: boolean;
@@ -66,6 +67,7 @@ export type TutorialsSeen = {
 
 export type AppState = {
   currentHours: number;
+  currentLdcHours: number;
   userName: string;
   goal: number;
   currentDate: string; // ISO string

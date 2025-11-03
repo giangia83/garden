@@ -13,26 +13,33 @@ import { ArrowUturnLeftIcon } from './icons/ArrowUturnLeftIcon';
 import { AcademicCapIcon } from './icons/AcademicCapIcon';
 import { XCircleIcon } from './icons/XCircleIcon';
 import ToggleSwitch from './ToggleSwitch';
+import { TrashIcon } from './icons/TrashIcon';
 
 interface AddHoursModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddHours: (hours: number, weather?: WeatherCondition) => void;
+  onAddLdcHours: (hours: number) => void;
   onSetHours: (hours: number) => void;
+  onSetLdcHours?: (hours: number) => void;
+  onDeleteLdcHours?: () => void;
   onSaveActivity: (activity: Omit<ActivityItem, 'id' | 'date'> & { recurring?: boolean }) => void;
   activityToEdit: ActivityItem | null;
   currentHours: number;
+  currentLdcHours?: number;
   isEditMode: boolean;
+  isEditLdcMode?: boolean;
   themeColor: ThemeColor;
   performanceMode: boolean;
   dateForEntry: Date | null;
   onSetHoursForDate: (hours: number, date: Date, weather?: WeatherCondition, isCampaign?: boolean) => void;
+  onSetLdcHoursForDate: (hours: number, date: Date) => void;
   onMarkDayStatus: (date: Date, status: DayStatus | null) => void;
   archives: Record<string, HistoryLog>;
   activities: ActivityItem[];
 }
 
-type ModalTab = 'hours' | 'visit' | 'study';
+type ModalTab = 'hours' | 'ldc' | 'visit' | 'study';
 
 const weatherOptions: { id: WeatherCondition, Icon: React.FC<React.SVGProps<SVGSVGElement>>, label: string, selectedClass: string }[] = [
     { id: 'sunny', Icon: SunIcon, label: 'Soleado', selectedClass: 'text-yellow-600 border-yellow-400 bg-yellow-50 dark:bg-yellow-500/10 dark:border-yellow-500/30' },
@@ -44,15 +51,21 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
   isOpen,
   onClose,
   onAddHours,
+  onAddLdcHours,
   onSetHours,
+  onSetLdcHours,
+  onDeleteLdcHours,
   onSaveActivity,
   activityToEdit,
   currentHours,
+  currentLdcHours = 0,
   isEditMode,
+  isEditLdcMode = false,
   themeColor,
   performanceMode,
   dateForEntry,
   onSetHoursForDate,
+  onSetLdcHoursForDate,
   onMarkDayStatus,
   archives,
   activities,
@@ -60,7 +73,9 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
   const [activeTab, setActiveTab] = useState<ModalTab>('hours');
   
   const [hoursInput, setHoursInput] = useState('');
+  const [ldcHoursInput, setLdcHoursInput] = useState('');
   const [isHoursValid, setIsHoursValid] = useState(true);
+  const [isLdcHoursValid, setIsLdcHoursValid] = useState(true);
   const [selectedWeather, setSelectedWeather] = useState<WeatherCondition | undefined>(undefined);
   
   // Activity state
@@ -109,11 +124,13 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
         setLocation(activityToEdit.location || '');
         setComments(activityToEdit.comments || '');
         setHoursInput('');
+        setLdcHoursInput('');
         setSelectedWeather(undefined);
         setIsRecurringActivity(activityToEdit.recurring || false);
         setIsCampaignDay(false);
       } else if (dateForEntry) {
         setHoursInput(dayEntryForDate && dayEntryForDate.hours > 0 ? hoursToHHMM(dayEntryForDate.hours) : '');
+        setLdcHoursInput(dayEntryForDate && dayEntryForDate.ldcHours && dayEntryForDate.ldcHours > 0 ? hoursToHHMM(dayEntryForDate.ldcHours) : '');
         setSelectedWeather(dayEntryForDate?.weather);
         setIsCampaignDay(dayEntryForDate?.isCampaign || false);
         setActiveTab('hours');
@@ -121,13 +138,27 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
         setLocation('');
         setComments('');
         setIsRecurringActivity(false);
+      } else if (isEditLdcMode) {
+        setActiveTab('ldc');
+        setLdcHoursInput(hoursToHHMM(currentLdcHours));
+        setHoursInput('');
+        setIsHoursValid(true);
+        setIsLdcHoursValid(true);
+        setName('');
+        setLocation('');
+        setComments('');
+        setSelectedWeather(undefined);
+        setIsRecurringActivity(false);
+        setIsCampaignDay(false);
       } else {
         if (isEditMode) {
           setHoursInput(hoursToHHMM(currentHours));
         } else {
           setHoursInput('');
         }
+        setLdcHoursInput('');
         setIsHoursValid(true);
+        setIsLdcHoursValid(true);
         setName('');
         setLocation('');
         setComments('');
@@ -137,7 +168,7 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
         setIsCampaignDay(false);
       }
     }
-  }, [isOpen, activityToEdit, currentHours, isEditMode, dateForEntry, dayEntryForDate]);
+  }, [isOpen, activityToEdit, currentHours, currentLdcHours, isEditMode, isEditLdcMode, dateForEntry, dayEntryForDate]);
 
   const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -150,9 +181,20 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
     setIsHoursValid(!isNaN(decimalHours) && decimalHours >= 0);
   };
   
+  const handleLdcHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setLdcHoursInput(value);
+    if (value.trim() === '') {
+      setIsLdcHoursValid(true);
+      return;
+    }
+    const decimalHours = flexibleInputToHours(value);
+    setIsLdcHoursValid(!isNaN(decimalHours) && decimalHours >= 0);
+  };
+  
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (activeTab === 'hours' && !isEditingActivity) {
+    if (activeTab === 'hours') {
       const hoursValue = flexibleInputToHours(hoursInput);
       const finalHours = (isNaN(hoursValue) || hoursValue < 0) ? 0 : hoursValue;
 
@@ -163,7 +205,17 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
       } else {
         onAddHours(finalHours, selectedWeather);
       }
-    } else {
+    } else if (activeTab === 'ldc') {
+      const ldcHoursValue = flexibleInputToHours(ldcHoursInput);
+      const finalLdcHours = (isNaN(ldcHoursValue) || ldcHoursValue < 0) ? 0 : ldcHoursValue;
+      if (isEditingForDate) {
+        onSetLdcHoursForDate(finalLdcHours, dateForEntry!);
+      } else if (isEditLdcMode) {
+        onSetLdcHours?.(finalLdcHours);
+      } else {
+        onAddLdcHours(finalLdcHours);
+      }
+    } else { // visit or study
       if (name.trim() === '') return;
       onSaveActivity({
         type: activeTab as ActivityType,
@@ -177,6 +229,7 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
   
   const getModalTitle = () => {
     if (isEditingActivity) return `Editar ${activityToEdit.type === 'study' ? 'Estudio' : 'Revisita'}`;
+    if (isEditLdcMode) return 'Editar Horas LDC';
     if (dateForEntry) {
         const today = new Date();
         today.setHours(0,0,0,0);
@@ -193,10 +246,9 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
   };
 
   const getButtonText = () => {
-    if (isEditingActivity) return 'Guardar Cambios';
-    if (activeTab === 'hours') {
-        return 'Guardar Horas';
-    }
+    if (isEditingActivity || isEditMode || isEditLdcMode || isEditingForDate) return 'Guardar Cambios';
+    if (activeTab === 'hours') return 'Guardar Horas';
+    if (activeTab === 'ldc') return 'Guardar Horas LDC';
     return 'Guardar Actividad';
   };
   
@@ -208,6 +260,15 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
   };
   
   const isDaySick = dayEntryForDate?.status === 'sick';
+
+  const TABS_ORDER: ModalTab[] = ['hours', 'ldc', 'visit', 'study'];
+  const TABS_LABELS: Record<ModalTab, string> = {
+    hours: 'Horas',
+    ldc: 'LDC',
+    visit: 'Revisita',
+    study: 'Estudio'
+  };
+
 
   return (
     <div
@@ -224,9 +285,27 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
         <div className="w-10 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto mt-3 mb-4" />
         <div className="p-6 pt-0 max-h-[85vh] overflow-y-auto">
           <form onSubmit={handleSubmit}>
-            {!isEditingForDate && !isEditingActivity && (
+            {!isEditingForDate && !isEditingActivity && !isEditLdcMode && (
                  <div className="flex bg-slate-200 dark:bg-slate-800 rounded-lg p-1 mb-6">
-                    {['hours', 'visit', 'study'].map((tab) => (
+                    {TABS_ORDER.map((tab) => (
+                    <button
+                        key={tab}
+                        type="button"
+                        onClick={() => setActiveTab(tab)}
+                        className={`flex-1 py-2 text-sm font-semibold rounded-md transition-colors ${
+                        activeTab === tab
+                            ? `bg-white dark:bg-slate-700 ${theme.text} shadow`
+                            : 'text-slate-600 dark:text-slate-300 hover:bg-slate-300/50 dark:hover:bg-slate-700/50'
+                        }`}
+                    >
+                        {TABS_LABELS[tab]}
+                    </button>
+                    ))}
+                </div>
+            )}
+             {isEditingForDate && !isEditingActivity && (
+                 <div className="flex bg-slate-200 dark:bg-slate-800 rounded-lg p-1 mb-6">
+                    {['hours', 'ldc'].map((tab) => (
                     <button
                         key={tab}
                         type="button"
@@ -237,7 +316,7 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
                             : 'text-slate-600 dark:text-slate-300 hover:bg-slate-300/50 dark:hover:bg-slate-700/50'
                         }`}
                     >
-                        {tab === 'hours' ? 'Horas' : tab === 'visit' ? 'Revisita' : 'Estudio'}
+                         {tab === 'hours' ? 'Predicación' : 'LDC'}
                     </button>
                     ))}
                 </div>
@@ -310,6 +389,30 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
               </div>
             )}
 
+            {activeTab === 'ldc' && (
+              <div className="space-y-4">
+                 <h2 id="ldc-title" className="text-2xl font-bold text-slate-900 dark:text-slate-100 text-center">
+                  {getModalTitle()}
+                </h2>
+                <p className="text-center text-sm text-slate-500 dark:text-slate-400 -mt-2">Estas horas no cuentan para tu meta mensual.</p>
+                <div>
+                  <label htmlFor="ldc-hours-input" className="sr-only">Horas LDC</label>
+                  <input
+                    id="ldc-hours-input"
+                    type="text"
+                    value={ldcHoursInput}
+                    onChange={handleLdcHoursChange}
+                    placeholder="Ej: 8:00 o 6.5"
+                    className={`w-full px-4 py-3 text-center text-2xl font-bold bg-white dark:bg-slate-800 border rounded-lg focus:ring-2 ${theme.ring} outline-none transition dark:text-white ${isLdcHoursValid ? 'border-slate-300 dark:border-slate-600' : 'border-red-500 ring-2 ring-red-300'}`}
+                    onFocus={(e) => e.target.select()}
+                    autoFocus={isOpen}
+                    disabled={isDaySick}
+                  />
+                </div>
+                {!isLdcHoursValid && <p className="text-red-600 text-sm text-center -mt-2 mb-2">Formato inválido. Usa H:MM, H.MM o solo horas.</p>}
+              </div>
+            )}
+
             {(activeTab === 'visit' || activeTab === 'study') && (
               <div className="space-y-4">
                 <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 text-center">
@@ -347,7 +450,7 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
             
             <div className="flex flex-col space-y-3 mt-6">
               <button type="submit" className={`w-full px-6 py-3 rounded-lg ${theme.bg} text-white font-bold text-lg shadow-lg transition-transform disabled:opacity-70 disabled:cursor-not-allowed ${!performanceMode && 'transform hover:scale-105'}`}
-                disabled={!isHoursValid && activeTab === 'hours'}
+                disabled={(!isHoursValid && activeTab === 'hours') || (!isLdcHoursValid && activeTab === 'ldc')}
               >
                 {getButtonText()}
               </button>
@@ -356,6 +459,12 @@ const AddHoursModal: React.FC<AddHoursModalProps> = ({
                       {isDaySick ? <XCircleIcon className="w-5 h-5" /> : <MedicalIcon className="w-5 h-5" />}
                       {isDaySick ? 'Desmarcar como enfermo' : 'Marcar como enfermo'}
                   </button>
+              )}
+              {isEditLdcMode && onDeleteLdcHours && (
+                <button type="button" onClick={onDeleteLdcHours} className="w-full flex items-center justify-center gap-2 px-6 py-2 rounded-lg font-semibold transition-colors text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/50 hover:bg-red-200 dark:hover:bg-red-900/70">
+                    <TrashIcon className="w-5 h-5" />
+                    Eliminar Horas LDC del Mes
+                </button>
               )}
               <button type="button" onClick={onClose} className="w-full px-6 py-2 rounded-lg text-slate-600 dark:text-slate-300 font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
                 Cancelar
