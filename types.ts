@@ -1,4 +1,4 @@
-// FIX: Define ThemeColor here to break circular dependency with constants.ts
+// Fix: Moved ThemeColor here to serve as the single source for types.
 export type ThemeColor = 'blue' | 'pink' | 'green' | 'orange' | 'purple' | 'teal' | 'indigo' | 'red' | 'yellow' | 'wine' | 'bw';
 
 export type ThemeMode = 'light' | 'dark' | 'black';
@@ -55,6 +55,9 @@ export type SetupData = {
   previousHours: { [dateKey: string]: number };
   role: UserRole;
   currentMonthHours: number;
+  meetingDays: number[];
+  protectedDay: number | null;
+  protectedDaySetDate: string | null;
 };
 
 export type TutorialStep = {
@@ -86,7 +89,10 @@ export type AppState = {
   streak: number;
   lastLogDate: string | null; // ISO string
   protectedDay: number | null;
+  protectedDaySetDate?: string | null;
+  meetingDays?: number[];
   planningData?: PlanningData;
+  notes?: string;
 };
 
 export type PlanningBlock = {

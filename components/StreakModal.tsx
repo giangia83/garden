@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ThemeColor } from '../types';
 import { THEMES } from '../constants';
 import { GardenIcon } from './icons/GardenIcon';
@@ -12,7 +12,8 @@ interface StreakModalProps {
   streak: number;
   themeColor: ThemeColor;
   protectedDay: number | null;
-  onSetProtectedDay: (day: number | null) => void;
+  onSaveProtectedDay: (day: number | null) => void;
+  protectedDaySetDate: string | null;
   performanceMode: boolean;
 }
 
@@ -30,7 +31,8 @@ const StreakModal: React.FC<StreakModalProps> = ({
   streak,
   themeColor,
   protectedDay,
-  onSetProtectedDay,
+  onSaveProtectedDay,
+  protectedDaySetDate,
   performanceMode,
 }) => {
   const [hasBeenOpened, setHasBeenOpened] = useState(false);
@@ -43,11 +45,29 @@ const StreakModal: React.FC<StreakModalProps> = ({
     }
   }, [isOpen]);
 
+  const { isLocked, canChangeUntil } = useMemo(() => {
+    if (!protectedDaySetDate) return { isLocked: false, canChangeUntil: null };
+    const setDate = new Date(protectedDaySetDate);
+    const today = new Date();
+    const sevenDays = 7 * 24 * 60 * 60 * 1000;
+    const isLocked = (today.getTime() - setDate.getTime()) < sevenDays;
+
+    if (!isLocked) return { isLocked: false, canChangeUntil: null };
+    
+    const canChangeDate = new Date(setDate);
+    canChangeDate.setDate(canChangeDate.getDate() + 7);
+    return { 
+        isLocked: true, 
+        canChangeUntil: canChangeDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })
+    };
+  }, [protectedDaySetDate]);
+
   const handleDayClick = (dayValue: number) => {
+    if (isLocked) return;
     if (protectedDay === dayValue) {
-      onSetProtectedDay(null); // Deseleccionar
+      onSaveProtectedDay(null); // Deseleccionar
     } else {
-      onSetProtectedDay(dayValue);
+      onSaveProtectedDay(dayValue);
     }
   };
 
@@ -93,16 +113,22 @@ const StreakModal: React.FC<StreakModalProps> = ({
                             <button 
                                 key={day.value}
                                 onClick={() => handleDayClick(day.value)}
-                                className={`w-10 h-10 rounded-full font-bold text-sm flex items-center justify-center border-2 ${
+                                disabled={isLocked}
+                                className={`w-10 h-10 rounded-full font-bold text-sm flex items-center justify-center border-2 transition-all ${
                                     protectedDay === day.value 
                                     ? `${theme.bg} text-white border-transparent shadow-md` 
                                     : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-transparent hover:border-slate-400'
-                                }`}
+                                } ${isLocked ? 'cursor-not-allowed opacity-60' : ''}`}
                             >
                                 {day.label}
                             </button>
                         ))}
                     </div>
+                    {isLocked && canChangeUntil && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                            Podrás cambiarlo de nuevo el {canChangeUntil}.
+                        </p>
+                    )}
                 </div>
             </div>
 

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { THEMES, THEME_LIST } from '../constants';
+// Fix: Import ThemeConfig to correctly type the theme object.
+import { THEMES, THEME_LIST, ThemeConfig } from '../constants';
 import { ThemeColor, SetupData, Shape, ThemeMode, UserRole } from '../types';
 import { ListBulletIcon } from './icons/ListBulletIcon';
 import { HeartIcon } from './icons/HeartIcon';
@@ -28,7 +29,8 @@ interface WelcomeProps {
   performanceMode: boolean;
 }
 
-type Theme = typeof THEMES[ThemeColor];
+// Fix: Correctly define the Theme type using the imported ThemeConfig.
+type Theme = ThemeConfig;
 
 const StreakCounterAnimation: React.FC<{ isActive: boolean, theme: Theme }> = ({ isActive, theme }) => {
   const [count, setCount] = useState(1);
@@ -50,7 +52,6 @@ const StreakCounterAnimation: React.FC<{ isActive: boolean, theme: Theme }> = ({
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
-      setCount(1); // Reset when not active
     }
 
     return () => {
@@ -210,21 +211,26 @@ const slideData: Slide[] = [
   {
     type: 'setup',
     step: 2,
+    title: "Tu Rutina Semanal",
+  },
+  {
+    type: 'setup',
+    step: 3,
     title: "Cuéntame de tu servicio",
   },
    {
     type: 'setup',
-    step: 3,
+    step: 4,
     title: "Horas de este mes",
   },
   {
     type: 'setup',
-    step: 4,
+    step: 5,
     title: "Horas del año de servicio",
   },
   {
     type: 'setup',
-    step: 5,
+    step: 6,
     title: "Cuéntame de ti",
   },
   {
@@ -278,6 +284,8 @@ const Welcome: React.FC<WelcomeProps> = ({
   const [role, setRole] = useState<UserRole>('reg_pioneer');
   const [currentMonthHours, setCurrentMonthHours] = useState('');
   const [previousHours, setPreviousHours] = useState<{ [key: string]: number }>({});
+  const [meetingDays, setMeetingDays] = useState<Set<number>>(new Set());
+  const [protectedDay, setProtectedDay] = useState<number | null>(null);
 
   const monthsForSetup = useMemo(() => getServiceYearMonthsForSetup(), []);
   const userSelectedTheme = THEMES[themeColor] || THEMES.green;
@@ -368,7 +376,10 @@ const Welcome: React.FC<WelcomeProps> = ({
         name: name || 'Precursor',
         role,
         currentMonthHours: parseFloat(currentMonthHours.replace(',', '.')) || 0,
-        previousHours
+        previousHours,
+        meetingDays: Array.from(meetingDays),
+        protectedDay,
+        protectedDaySetDate: protectedDay !== null ? new Date().toISOString() : null,
       });
     }
   };
@@ -396,6 +407,17 @@ const Welcome: React.FC<WelcomeProps> = ({
     { name: 'light', Icon: SunIcon, label: 'Claro' },
     { name: 'dark', Icon: MoonIcon, label: 'Oscuro' },
     { name: 'black', Icon: SolidCircleIcon, label: 'Negro' },
+  ];
+
+  const weekDaysForMeeting = [
+    { label: 'D', value: 0 }, { label: 'L', value: 1 }, { label: 'M', value: 2 }, 
+    { label: 'M', value: 3 }, { label: 'J', value: 4 }, { label: 'V', value: 5 }, 
+    { label: 'S', value: 6 },
+  ];
+
+  const weekDaysForRest = [
+    { label: 'L', value: 1 }, { label: 'M', value: 2 }, { label: 'M', value: 3 }, 
+    { label: 'J', value: 4 }, { label: 'V', value: 5 },
   ];
   
   return (
@@ -487,7 +509,53 @@ const Welcome: React.FC<WelcomeProps> = ({
                   <>
                     <h2 className={`text-3xl font-bold ${mainTextColor} mb-4 tracking-tight`}>{slide.title}</h2>
                     <div className={`w-full max-w-sm text-left space-y-4 ${cardBgColor} p-4 rounded-xl shadow-inner h-full max-h-96 flex flex-col`}>
-                      {slide.step === 2 && (
+                      {slide.title === 'Tu Rutina Semanal' && (
+                        <div className="space-y-4">
+                           <div>
+                              <label className={`text-sm font-medium ${subTextColor}`}>Marca tus días de reunión</label>
+                              <div className="flex justify-center gap-1.5 mt-2">
+                                  {weekDaysForMeeting.map(day => (
+                                      <button 
+                                          key={`meeting-${day.value}`}
+                                          onClick={() => setMeetingDays(prev => {
+                                              const newSet = new Set(prev);
+                                              if (newSet.has(day.value)) newSet.delete(day.value);
+                                              else newSet.add(day.value);
+                                              return newSet;
+                                          })}
+                                          className={`w-9 h-9 rounded-full font-bold text-sm flex items-center justify-center border-2 transition-all ${
+                                              meetingDays.has(day.value) 
+                                              ? `${displayTheme.bg} text-white border-transparent shadow-sm` 
+                                              : `${inputBgColor} ${subTextColor} ${inputBorderColor} hover:border-slate-400 dark:hover:border-slate-400`
+                                          }`}
+                                      >
+                                          {day.label}
+                                      </button>
+                                  ))}
+                              </div>
+                           </div>
+                           <div>
+                              <label className={`text-sm font-medium ${subTextColor}`}>Elige tu día de descanso (opcional)</label>
+                              <p className="text-xs text-slate-400 mt-1">Este día protegerá tu racha, además del fin de semana. Podrás cambiarlo cada 7 días.</p>
+                              <div className="flex justify-center gap-2 mt-2">
+                                  {weekDaysForRest.map(day => (
+                                      <button 
+                                          key={`rest-${day.value}`}
+                                          onClick={() => setProtectedDay(p => p === day.value ? null : day.value)}
+                                          className={`w-10 h-10 rounded-full font-bold text-sm flex items-center justify-center border-2 transition-all ${
+                                              protectedDay === day.value
+                                              ? `${displayTheme.bg} text-white border-transparent shadow-sm` 
+                                              : `${inputBgColor} ${subTextColor} ${inputBorderColor} hover:border-slate-400 dark:hover:border-slate-400`
+                                          }`}
+                                      >
+                                          {day.label}
+                                      </button>
+                                  ))}
+                              </div>
+                           </div>
+                        </div>
+                      )}
+                      {slide.title === "Cuéntame de tu servicio" && (
                         <div className="space-y-3">
                             <div className="grid grid-cols-2 gap-2">
                                 <RoleButton label="Publicador" value="publisher" current={role} onClick={setRole} theme={displayTheme} />
@@ -503,13 +571,13 @@ const Welcome: React.FC<WelcomeProps> = ({
                             )}
                         </div>
                       )}
-                       {slide.step === 3 && (
+                       {slide.title === "Horas de este mes" && (
                          <div>
                             <label className={`text-sm font-medium ${subTextColor}`}>{`¿Cuántas horas has hecho hasta hoy en el mes actual?${role === 'publisher' ? ' (Opcional)' : ''}`}</label>
                              <input type="text" value={currentMonthHours} onChange={(e) => setCurrentMonthHours(e.target.value)} placeholder="Ej: 15.5 o 15:30" className={`w-full mt-2 p-3 text-center text-xl ${inputBgColor} border ${inputBorderColor} rounded-lg focus:ring-2 ${displayTheme.ring} outline-none transition`} inputMode="decimal" />
                          </div>
                       )}
-                      {slide.step === 4 && (
+                      {slide.title === "Horas del año de servicio" && (
                         <div className="flex-grow flex flex-col min-h-0">
                           <div className="flex-shrink-0">
                             <label className={`text-sm font-medium ${subTextColor}`}>Horas de meses pasados</label>
@@ -529,7 +597,7 @@ const Welcome: React.FC<WelcomeProps> = ({
                           </div>
                         </div>
                       )}
-                      {slide.step === 5 && (
+                      {slide.title === "Cuéntame de ti" && (
                         <div>
                             <label className={`text-sm font-medium ${subTextColor}`}>Tu nombre</label>
                             <div className="relative mt-1">

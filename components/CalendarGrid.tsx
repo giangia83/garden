@@ -17,6 +17,7 @@ interface CalendarGridProps {
   commemorationDate: Date | null;
   carryoverHours: number;
   planningData: PlanningData;
+  meetingDays: number[];
 }
 
 type CalendarDay = {
@@ -40,6 +41,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   commemorationDate,
   carryoverHours,
   planningData,
+  meetingDays,
 }) => {
   const theme = THEMES[themeColor] || THEMES.blue;
   const privacyBlur = isPrivacyMode ? 'blur-sm select-none pointer-events-none' : '';
@@ -148,6 +150,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                 
                 const isCampaign = dayEntry?.isCampaign;
                 const hasRecurringActivity = !isSummaryMonth && isCurrentMonth && recurringActivitiesByDayOfWeek.has(date.getDay());
+                const isMeetingDay = isCurrentMonth && !isSummaryMonth && meetingDays.includes(date.getDay());
 
                 const dayClasses = ['relative h-16 flex flex-col items-center justify-center rounded-lg'];
 
@@ -187,21 +190,22 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                         className={dayClasses.join(' ')}
                         disabled={!isCurrentMonth || isSummaryMonth}
                     >
-                        {isCurrentMonth && (hasActivity || hasRecurringActivity) && !isSummaryMonth && (
+                        {isCurrentMonth && (hasActivity || hasRecurringActivity) && !isSummaryMonth && !isPrivacyMode && (
                             <div className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ${hasRecurringActivity ? 'bg-purple-500' : theme.bg}`}></div>
                         )}
-                        {hasPlan && !isSummaryMonth && (
+                        {hasPlan && !isSummaryMonth && !isPrivacyMode && (
                            <ClipboardDocumentListIcon className="absolute bottom-1.5 left-1.5 w-4 h-4 text-slate-400 dark:text-slate-500" />
                         )}
-                        {hasRecurringActivity && !isSummaryMonth &&
+                        {hasRecurringActivity && !isSummaryMonth && !isPrivacyMode &&
                             <BookOpenIcon className="absolute top-1.5 left-1.5 w-4 h-4 text-slate-500 dark:text-slate-400" />
                         }
-                        {ldcHours > 0 && !isSummaryMonth &&
+                        {ldcHours > 0 && !isSummaryMonth && !isPrivacyMode &&
                             <BuildingOfficeIcon className="absolute bottom-1.5 right-1.5 w-4 h-4 text-slate-500 dark:text-slate-400" />
                         }
 
-                        <span className={`text-sm font-semibold ${isCommemoration ? 'text-white dark:text-red-100' : isCurrentMonth ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500'}`}>
+                        <span className={`text-sm font-semibold flex items-center justify-center ${isCommemoration ? 'text-white dark:text-red-100' : isCurrentMonth ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500'}`}>
                             {date.getDate()}
+                            {isMeetingDay && !isPrivacyMode && <span className="ml-1 w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-500" />}
                         </span>
                         
                         <div className={`flex flex-col items-center justify-center -mt-1 ${privacyBlur}`}>

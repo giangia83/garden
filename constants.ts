@@ -1,7 +1,11 @@
-
 import { ThemeColor } from "./types";
 
-type ThemeConfig = {
+
+// Fix: Define and export ThemeColor here to break the circular dependency.
+// export type ThemeColor = 'blue' | 'pink' | 'green' | 'orange' | 'purple' | 'teal' | 'indigo' | 'red' | 'yellow' | 'wine' | 'bw';
+
+// Fix: Export ThemeConfig to be used in other components
+export type ThemeConfig = {
   name: ThemeColor;
   gradientFrom: string;
   gradientTo: string;

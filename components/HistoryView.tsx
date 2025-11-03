@@ -19,6 +19,7 @@ interface HistoryViewProps {
   onDayClick: (date: Date) => void;
   activities: ActivityItem[];
   planningData: PlanningData;
+  meetingDays: number[];
 }
 
 const Stat: React.FC<{ Icon: React.FC<any>, count: number | string, label: string, colorClass: string }> = ({ Icon, count, label, colorClass }) => (
@@ -30,7 +31,7 @@ const Stat: React.FC<{ Icon: React.FC<any>, count: number | string, label: strin
 );
 
 
-const HistoryView: React.FC<HistoryViewProps> = ({ archives, currentServiceYear, themeColor, isPrivacyMode, onDayClick, activities, planningData }) => {
+const HistoryView: React.FC<HistoryViewProps> = ({ archives, currentServiceYear, themeColor, isPrivacyMode, onDayClick, activities, planningData, meetingDays }) => {
   const theme = THEMES[themeColor] || THEMES.blue;
   const [selectedYear, setSelectedYear] = useState(currentServiceYear);
 
@@ -166,6 +167,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ archives, currentServiceYear,
             commemorationDate={commemorationDate}
             carryoverHours={carryoverHours}
             planningData={planningData}
+            meetingDays={meetingDays}
         />
       </div>
 

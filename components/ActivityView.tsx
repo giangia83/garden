@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ActivityItem, ThemeColor, GroupArrangement } from '../types';
 import ActivityCard from './ActivityCard';
 import { THEMES } from '../constants';
@@ -21,9 +21,11 @@ interface ActivityViewProps {
   performanceMode: boolean;
   currentDate: Date;
   isPrivacyMode: boolean;
+  notes: string;
+  onSaveNotes: (notes: string) => void;
 }
 
-type ActivityTab = 'groups' | 'visits' | 'studies';
+type ActivityTab = 'groups' | 'visits' | 'studies' | 'notes';
 
 const ActivityView: React.FC<ActivityViewProps> = ({ 
   activities, 
@@ -36,11 +38,18 @@ const ActivityView: React.FC<ActivityViewProps> = ({
   performanceMode,
   currentDate,
   isPrivacyMode,
+  notes,
+  onSaveNotes,
 }) => {
   const [activeTab, setActiveTab] = useState<ActivityTab>('groups');
   const [isImportModalOpen, setImportModalOpen] = useState(false);
+  const [localNotes, setLocalNotes] = useState(notes);
   const theme = THEMES[themeColor] || THEMES.blue;
   const privacyBlur = isPrivacyMode ? 'blur-md select-none pointer-events-none' : '';
+
+  useEffect(() => {
+    setLocalNotes(notes);
+  }, [notes]);
 
   const monthlySummary = useMemo(() => {
     const now = currentDate;
@@ -65,6 +74,7 @@ const ActivityView: React.FC<ActivityViewProps> = ({
   }, [activities, currentDate]);
 
   const filteredActivities = useMemo(() => {
+    if (activeTab !== 'visits' && activeTab !== 'studies') return [];
     const typeToShow = activeTab === 'visits' ? 'visit' : 'study';
     return activities
       .filter(a => a.type === typeToShow)
@@ -75,6 +85,7 @@ const ActivityView: React.FC<ActivityViewProps> = ({
       { id: 'groups', label: 'Grupos' },
       { id: 'visits', label: 'Revisitas' },
       { id: 'studies', label: 'Estudios' },
+      { id: 'notes', label: 'Notas' },
   ];
   
   const handleProcessComplete = (arrangements: GroupArrangement[]) => {
@@ -124,6 +135,25 @@ const ActivityView: React.FC<ActivityViewProps> = ({
             </button>
         </div>
       )
+    }
+
+    if (activeTab === 'notes') {
+      return (
+          <div className="animate-fadeIn">
+              <textarea
+                  value={localNotes}
+                  onChange={(e) => setLocalNotes(e.target.value)}
+                  onBlur={() => onSaveNotes(localNotes)}
+                  placeholder="Escribe aquí tus notas personales sobre el ministerio..."
+                  rows={15}
+                  className="w-full p-4 bg-white dark:bg-slate-800 border border-slate-200/50 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition resize-none dark:text-white shadow-sm"
+                  aria-label="Área de notas"
+              />
+               <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-2">
+                  Las notas se guardan automáticamente.
+              </p>
+          </div>
+      );
     }
 
     if (filteredActivities.length > 0) {

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
@@ -213,6 +212,9 @@ const getInitialState = (): AppState | null => {
     if (!parsed.currentLdcHours) parsed.currentLdcHours = 0;
     if (!parsed.planningData) parsed.planningData = {};
     if (!parsed.userRole) parsed.userRole = 'reg_pioneer';
+    if (!parsed.notes) parsed.notes = '';
+    if (!parsed.meetingDays) parsed.meetingDays = [];
+    if (!parsed.protectedDaySetDate) parsed.protectedDaySetDate = null;
 
     // Remove legacy streak restore fields
     delete parsed.streakRestores;
@@ -281,11 +283,14 @@ const App: React.FC = () => {
   const [activities, setActivities] = useState<ActivityItem[]>(initialState?.activities ?? []);
   const [groupArrangements, setGroupArrangements] = useState<GroupArrangement[]>(initialState?.groupArrangements ?? []);
   const [planningData, setPlanningData] = useState<PlanningData>(initialState?.planningData ?? {});
+  const [notes, setNotes] = useState(initialState?.notes ?? '');
+  const [meetingDays, setMeetingDays] = useState<number[]>(initialState?.meetingDays ?? []);
 
   // Streak State
   const [streak, setStreak] = useState(initialState?.streak ?? 0);
   const [lastLogDate, setLastLogDate] = useState<Date | null>(initialState?.lastLogDate ? new Date(initialState.lastLogDate) : null);
   const [protectedDay, setProtectedDay] = useState<number | null>(initialState?.protectedDay ?? null);
+  const [protectedDaySetDate, setProtectedDaySetDate] = useState<string | null>(initialState?.protectedDaySetDate ?? null);
   
   const [activeView, setActiveView] = useState<AppView>(getViewFromHash(window.location.hash));
   const [isAddHoursModalOpen, setAddHoursModalOpen] = useState(false);
@@ -536,10 +541,13 @@ const App: React.FC = () => {
       streak,
       lastLogDate: lastLogDate ? lastLogDate.toISOString() : null,
       protectedDay,
+      protectedDaySetDate,
+      meetingDays,
       planningData,
+      notes,
     };
     localStorage.setItem(APP_STORAGE_key, JSON.stringify(stateToSave));
-  }, [currentHours, currentLdcHours, userName, goal, userRole, currentDate, progressShape, themeColor, themeMode, archives, currentServiceYear, activities, groupArrangements, streak, lastLogDate, protectedDay, planningData]);
+  }, [currentHours, currentLdcHours, userName, goal, userRole, currentDate, progressShape, themeColor, themeMode, archives, currentServiceYear, activities, groupArrangements, streak, lastLogDate, protectedDay, protectedDaySetDate, meetingDays, planningData, notes]);
   
   useEffect(() => {
     localStorage.setItem(PRIVACY_MODE_KEY, String(isPrivacyMode));
@@ -1054,6 +1062,10 @@ const App: React.FC = () => {
     setCurrentHours(data.currentMonthHours);
     if(data.currentMonthHours > 0) updateStreak();
 
+    setMeetingDays(data.meetingDays);
+    setProtectedDay(data.protectedDay);
+    setProtectedDaySetDate(data.protectedDaySetDate);
+
     localStorage.setItem(WELCOME_SHOWN_KEY, 'true');
     setShowWelcome(false);
     window.location.hash = '#/';
@@ -1061,6 +1073,10 @@ const App: React.FC = () => {
 
   const handleSaveArrangements = (arrangements: GroupArrangement[]) => {
     setGroupArrangements(arrangements);
+  };
+
+  const handleSaveNotes = (newNotes: string) => {
+    setNotes(newNotes);
   };
   
   const handleShowWelcome = () => {
@@ -1146,7 +1162,10 @@ const App: React.FC = () => {
         setStreak(importedState.streak);
         setLastLogDate(importedState.lastLogDate ? new Date(importedState.lastLogDate) : null);
         setProtectedDay(importedState.protectedDay);
+        setProtectedDaySetDate(importedState.protectedDaySetDate || null);
+        setMeetingDays(importedState.meetingDays || []);
         setPlanningData(importedState.planningData || {});
+        setNotes(importedState.notes || '');
     }
     setImportConfirmModalOpen(false);
     setImportedState(null);
@@ -1168,6 +1187,16 @@ const App: React.FC = () => {
   const handleStartFirstLog = () => {
     setStreakTutorialModalOpen(false);
     openAddModal();
+  };
+
+  const handleSaveProtectedDay = (day: number | null) => {
+    if (day !== null && day !== protectedDay) {
+      setProtectedDaySetDate(new Date().toISOString());
+    }
+    if (day === null && protectedDay !== null) {
+      setProtectedDaySetDate(null);
+    }
+    setProtectedDay(day);
   };
 
   const viewTitleMap: Record<AppView, string> = {
@@ -1252,6 +1281,8 @@ const App: React.FC = () => {
                   performanceMode={performanceMode}
                   currentDate={currentDate}
                   isPrivacyMode={isPrivacyMode}
+                  notes={notes}
+                  onSaveNotes={handleSaveNotes}
                 />;
       case 'history':
         return <HistoryView 
@@ -1262,6 +1293,7 @@ const App: React.FC = () => {
           onDayClick={handleDayClickForHistory}
           activities={activities}
           planningData={planningData}
+          meetingDays={meetingDays}
         />;
       case 'planning':
         return <PlanningView
@@ -1397,7 +1429,8 @@ const App: React.FC = () => {
         streak={streak}
         themeColor={themeColor}
         protectedDay={protectedDay}
-        onSetProtectedDay={setProtectedDay}
+        onSaveProtectedDay={handleSaveProtectedDay}
+        protectedDaySetDate={protectedDaySetDate}
         performanceMode={performanceMode}
       />
 
