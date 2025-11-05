@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { ThemeColor, HistoryLog, DayEntry } from '../types';
 import { THEMES } from '../constants';
@@ -90,7 +91,7 @@ const PaceTracker: React.FC<PaceTrackerProps> = ({
 
   if (isGhostMode && isPioneer) {
       if (!isGhostDataAvailable) {
-          message = "El 'Modo Fantasma' estará disponible el próximo mes.";
+          message = "El 'Modo Espejo' estará disponible el próximo mes.";
       } else if (ghostHoursUpToToday === 0 && currentHours > 0) {
           message = <>¡Excelente! El mes pasado no tenías horas en esta fecha.</>;
           textColor = 'text-green-600 dark:text-green-400';

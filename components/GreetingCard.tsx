@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { ThemeColor } from '../types';
 import { THEMES } from '../constants';
@@ -6,6 +7,7 @@ interface GreetingCardProps {
   userName: string;
   themeColor: ThemeColor;
   performanceMode: boolean;
+  isSimpleMode: boolean;
 }
 
 const getGreeting = () => {
@@ -19,10 +21,24 @@ const getGreeting = () => {
   }
 };
 
-const GreetingCard: React.FC<GreetingCardProps> = ({ userName, themeColor, performanceMode = false }) => {
+const GreetingCard: React.FC<GreetingCardProps> = ({ userName, themeColor, performanceMode = false, isSimpleMode }) => {
   const theme = THEMES[themeColor] || THEMES.blue;
-  const greeting = getGreeting();
   const animationClass = performanceMode ? '' : 'animate-fadeInUp';
+
+  if (isSimpleMode) {
+    return (
+      <div className={`mt-8 text-center ${animationClass}`}>
+        <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-300">
+          Modo Simplificado Activado
+        </h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto mt-1">
+          Funciones como estadísticas, modo espejo y logros están ocultas para una experiencia más sencilla.
+        </p>
+      </div>
+    );
+  }
+
+  const greeting = getGreeting();
 
   return (
     <div className={`mt-8 text-center ${animationClass}`}>

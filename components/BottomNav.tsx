@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { PlusIcon } from './icons/PlusIcon';
 import { CalendarIcon } from './icons/CalendarIcon';
@@ -14,6 +15,7 @@ interface BottomNavProps {
   onAddClick: () => void;
   themeColor: ThemeColor;
   performanceMode?: boolean;
+  isSimpleMode?: boolean;
 }
 
 const BottomNav: React.FC<BottomNavProps> = ({ 
@@ -21,16 +23,21 @@ const BottomNav: React.FC<BottomNavProps> = ({
   onAddClick,
   themeColor,
   performanceMode = false,
+  isSimpleMode = false,
 }) => {
   const theme = THEMES[themeColor] || THEMES.blue;
 
-  const navItems = [
+  const allNavItems = [
     { view: 'tracker', hash: '#/', Icon: HomeIcon, label: 'Informe' },
     { view: 'planning', hash: '#/planning', Icon: ClockIcon, label: 'Plan' },
     { view: 'add', hash: '', Icon: PlusIcon, label: 'Agregar' },
     { view: 'activity', hash: '#/activity', Icon: ListBulletIcon, label: 'Actividad' },
     { view: 'history', hash: '#/history', Icon: CalendarIcon, label: 'Historial' },
   ];
+
+  const navItems = isSimpleMode
+    ? allNavItems.filter(item => ['tracker', 'add', 'activity', 'history'].includes(item.view))
+    : allNavItems;
   
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-gray-50/70 dark:bg-slate-900/70 backdrop-blur-lg border-t border-slate-200/60 dark:border-slate-700/60 z-10">

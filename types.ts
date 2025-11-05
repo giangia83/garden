@@ -1,5 +1,21 @@
-// Fix: Moved ThemeColor here to serve as the single source for types.
-export type ThemeColor = 'blue' | 'pink' | 'green' | 'orange' | 'purple' | 'teal' | 'indigo' | 'red' | 'yellow' | 'wine' | 'bw';
+// FIX: Import React to use React types like React.FC
+import React from 'react';
+import { THEMES } from "./constants";
+
+export type ThemeColor = 'blue' | 'pink' | 'green' | 'orange' | 'purple' | 'teal' | 'indigo' | 'red' | 'yellow' | 'wine' | 'bw' | 'blush' | 'sunset' | 'ocean' | 'forest' | 'lavender';
+
+export type ThemeConfig = {
+  name: ThemeColor;
+  gradientFrom: string;
+  gradientTo: string;
+  gradientFromColor: string;
+  gradientToColor: string;
+  bg: string;
+  text: string;
+  ring: string;
+  accentText: string;
+  accentTextLight: string;
+};
 
 export type ThemeMode = 'light' | 'dark' | 'black';
 
@@ -52,6 +68,7 @@ export type UserRole = 'publisher' | 'aux_pioneer' | 'reg_pioneer' | 'spec_pione
 
 export type SetupData = {
   name: string;
+  goal: number;
   previousHours: { [dateKey: string]: number };
   role: UserRole;
   currentMonthHours: number;
@@ -69,7 +86,25 @@ export type TutorialStep = {
 };
 
 export type TutorialsSeen = {
-  [key in 'tracker' | 'activity' | 'history' | 'planning']?: boolean;
+  // FIX: Add 'achievements' to the type to match usage in App.tsx
+  [key in 'tracker' | 'activity' | 'history' | 'planning' | 'achievements']?: boolean;
+};
+
+export type Achievement = {
+  id: string;
+  title: string;
+  description: (tierGoal: number) => string;
+  icon: React.FC<any>;
+  tiers: number[];
+  check: (state: AppState) => { unlocked: boolean; currentProgress: number };
+  unlockedTier?: number; // Only for toast
+};
+
+export type UnlockedAchievements = {
+  [id: string]: {
+    unlockedTier: number;
+    unlockedAt: string; // ISO date string
+  };
 };
 
 export type AppState = {
@@ -93,6 +128,7 @@ export type AppState = {
   meetingDays?: number[];
   planningData?: PlanningData;
   notes?: string;
+  unlockedAchievements?: UnlockedAchievements;
 };
 
 export type PlanningBlock = {
@@ -105,3 +141,5 @@ export type PlanningBlock = {
 export type PlanningData = {
   [dateKey: string]: PlanningBlock[];
 };
+
+export type AppView = 'tracker' | 'activity' | 'history' | 'planning' | 'achievements';

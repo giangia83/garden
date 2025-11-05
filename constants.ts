@@ -1,22 +1,4 @@
-import { ThemeColor } from "./types";
-
-
-// Fix: Define and export ThemeColor here to break the circular dependency.
-// export type ThemeColor = 'blue' | 'pink' | 'green' | 'orange' | 'purple' | 'teal' | 'indigo' | 'red' | 'yellow' | 'wine' | 'bw';
-
-// Fix: Export ThemeConfig to be used in other components
-export type ThemeConfig = {
-  name: ThemeColor;
-  gradientFrom: string;
-  gradientTo: string;
-  gradientFromColor: string;
-  gradientToColor: string;
-  bg: string;
-  text: string;
-  ring: string;
-  accentText: string;
-  accentTextLight: string;
-};
+import { ThemeColor, ThemeConfig } from "./types";
 
 export const THEMES: Record<ThemeColor, ThemeConfig> = {
   blue: {
@@ -141,15 +123,75 @@ export const THEMES: Record<ThemeColor, ThemeConfig> = {
   },
   bw: {
     name: 'bw',
-    gradientFrom: 'from-slate-100',
-    gradientTo: 'to-slate-400',
-    gradientFromColor: '#f1f5f9',
-    gradientToColor: '#94a3b8',
-    bg: 'bg-slate-800',
-    text: 'text-slate-50',
-    ring: 'focus:ring-slate-400',
+    gradientFrom: 'from-slate-500',
+    gradientTo: 'to-slate-700',
+    gradientFromColor: '#64748b',
+    gradientToColor: '#334155',
+    bg: 'bg-slate-600',
+    text: 'text-slate-100',
+    ring: 'focus:ring-slate-500',
     accentText: 'text-slate-100',
     accentTextLight: 'text-slate-200'
+  },
+  blush: {
+    name: 'blush',
+    gradientFrom: 'from-blue-500',
+    gradientTo: 'to-pink-500',
+    gradientFromColor: '#3b82f6',
+    gradientToColor: '#ec4899',
+    bg: 'bg-pink-600',
+    text: 'text-pink-600',
+    ring: 'focus:ring-pink-500',
+    accentText: 'text-pink-100',
+    accentTextLight: 'text-pink-200'
+  },
+  sunset: {
+    name: 'sunset',
+    gradientFrom: 'from-amber-500',
+    gradientTo: 'to-red-700',
+    gradientFromColor: '#f59e0b',
+    gradientToColor: '#b91c1c',
+    bg: 'bg-amber-600',
+    text: 'text-amber-600',
+    ring: 'focus:ring-amber-500',
+    accentText: 'text-amber-100',
+    accentTextLight: 'text-amber-200'
+  },
+  ocean: {
+    name: 'ocean',
+    gradientFrom: 'from-cyan-400',
+    gradientTo: 'to-blue-700',
+    gradientFromColor: '#22d3ee',
+    gradientToColor: '#1d4ed8',
+    bg: 'bg-cyan-600',
+    text: 'text-cyan-600',
+    ring: 'focus:ring-cyan-500',
+    accentText: 'text-cyan-100',
+    accentTextLight: 'text-cyan-200'
+  },
+  forest: {
+    name: 'forest',
+    gradientFrom: 'from-lime-500',
+    gradientTo: 'to-green-800',
+    gradientFromColor: '#84cc16',
+    gradientToColor: '#166534',
+    bg: 'bg-lime-600',
+    text: 'text-lime-600',
+    ring: 'focus:ring-lime-500',
+    accentText: 'text-lime-100',
+    accentTextLight: 'text-lime-200'
+  },
+  lavender: {
+    name: 'lavender',
+    gradientFrom: 'from-fuchsia-400',
+    gradientTo: 'to-indigo-600',
+    gradientFromColor: '#e879f9',
+    gradientToColor: '#4f46e5',
+    bg: 'bg-fuchsia-600',
+    text: 'text-fuchsia-600',
+    ring: 'focus:ring-fuchsia-500',
+    accentText: 'text-fuchsia-100',
+    accentTextLight: 'text-fuchsia-200'
   },
 };
 

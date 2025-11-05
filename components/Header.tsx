@@ -11,12 +11,13 @@ interface HeaderProps {
   onStreakClick: () => void;
   onMenuClick: () => void;
   onTitleClick: () => void;
+  isSimpleMode: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ title, themeColor, streak, onStreakClick, onMenuClick, onTitleClick }) => {
+const Header: React.FC<HeaderProps> = ({ title, themeColor, streak, onStreakClick, onMenuClick, onTitleClick, isSimpleMode }) => {
   const theme = THEMES[themeColor] || THEMES.blue;
   const useCustomFont = ['Garden'].includes(title);
-  const isTitleClickable = title === 'Garden';
+  const isTitleClickable = title === 'Garden' && !isSimpleMode;
 
   const TitleComponent = isTitleClickable ? 'button' : 'h1';
 

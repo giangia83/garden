@@ -9,6 +9,7 @@ const URLS_TO_CACHE = [
   '/types.ts',
   '/constants.ts',
   '/utils.ts',
+  '/achievements.ts',
   '/hooks/useOnlineStatus.ts',
   '/assets/icon-192x192.svg',
   '/assets/icon-512x512.svg',

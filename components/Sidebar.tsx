@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import ToggleSwitch from './ToggleSwitch';
-import { ThemeColor } from '../types';
+import { ThemeColor, UserRole } from '../types';
 import { THEMES } from '../constants';
 import { HeartIcon } from './icons/HeartIcon';
 import { ChatBubbleBottomCenterTextIcon } from './icons/ChatBubbleBottomCenterTextIcon';
@@ -12,6 +11,9 @@ import { ArrowDownTrayIcon } from './icons/ArrowDownTrayIcon';
 import { ArrowUpTrayIcon } from './icons/ArrowUpTrayIcon';
 import { BellIcon } from './icons/BellIcon';
 import { SettingsIcon } from './icons/SettingsIcon';
+import { StarIcon } from './icons/StarIcon';
+import { TrophyIcon } from './icons/TrophyIcon';
+import { FaceSmileIcon } from './icons/FaceSmileIcon';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -27,6 +29,11 @@ interface SidebarProps {
   reminderTime: string;
   onSetReminderTime: (time: string) => void;
   onSettingsClick: () => void;
+  userRole: UserRole;
+  onPioneerUpgradeClick: () => void;
+  onAchievementsClick: () => void;
+  isSimpleMode: boolean;
+  onSetSimpleMode: (enabled: boolean) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -43,6 +50,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   reminderTime,
   onSetReminderTime,
   onSettingsClick,
+  userRole,
+  onPioneerUpgradeClick,
+  onAchievementsClick,
+  isSimpleMode,
+  onSetSimpleMode,
 }) => {
   const [hasBeenOpened, setHasBeenOpened] = useState(false);
   const theme = THEMES[themeColor] || THEMES.blue;
@@ -83,14 +95,26 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className="bg-white dark:bg-slate-800 rounded-lg divide-y divide-slate-200 dark:divide-slate-700">
                 <div className="p-3 flex items-center justify-between">
                     <div className="flex items-center">
-                        <BoltIcon className={`w-6 h-6 mr-3 ${theme.text}`} />
+                        <FaceSmileIcon className={`w-6 h-6 mr-3 ${theme.text}`} />
                         <div>
-                            <p className="font-semibold text-slate-700 dark:text-slate-200">Modo Rendimiento</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">Desactiva animaciones.</p>
+                            <p className="font-semibold text-slate-700 dark:text-slate-200">Modo Simplificado</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Interfaz más sencilla.</p>
                         </div>
                     </div>
-                    <ToggleSwitch checked={performanceMode} onChange={onSetPerformanceMode} themeColor={themeColor}/>
+                    <ToggleSwitch checked={isSimpleMode} onChange={onSetSimpleMode} themeColor={themeColor}/>
                 </div>
+                {!isSimpleMode && (
+                    <div className="p-3 flex items-center justify-between">
+                        <div className="flex items-center">
+                            <BoltIcon className={`w-6 h-6 mr-3 ${theme.text}`} />
+                            <div>
+                                <p className="font-semibold text-slate-700 dark:text-slate-200">Modo Rendimiento</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">Desactiva animaciones.</p>
+                            </div>
+                        </div>
+                        <ToggleSwitch checked={performanceMode} onChange={onSetPerformanceMode} themeColor={themeColor}/>
+                    </div>
+                )}
                 <div className="p-3">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center">
@@ -122,6 +146,18 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="mb-6">
             <h3 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Acciones</h3>
             <div className="bg-white dark:bg-slate-800 rounded-lg divide-y divide-slate-200 dark:divide-slate-700">
+                {!isSimpleMode && userRole === 'publisher' && (
+                  <button onClick={onPioneerUpgradeClick} className="w-full text-left p-3 flex items-center hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                    <StarIcon className={`w-6 h-6 mr-3 ${theme.text}`} />
+                    <p className="font-semibold text-slate-700 dark:text-slate-200">Precursorado</p>
+                  </button>
+                )}
+                {!isSimpleMode && (
+                    <button onClick={onAchievementsClick} className="w-full text-left p-3 flex items-center hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                        <TrophyIcon className={`w-6 h-6 mr-3 ${theme.text}`} />
+                        <p className="font-semibold text-slate-700 dark:text-slate-200">Logros</p>
+                    </button>
+                )}
                 <button onClick={onSettingsClick} className="w-full text-left p-3 flex items-center hover:bg-slate-50 dark:hover:bg-slate-700/50">
                     <SettingsIcon className={`w-6 h-6 mr-3 ${theme.text}`} />
                     <p className="font-semibold text-slate-700 dark:text-slate-200">Configuración</p>

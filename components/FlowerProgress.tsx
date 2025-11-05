@@ -23,6 +23,7 @@ const ShapeProgress: React.FC<ShapeProgressProps> = ({ progress, shape, themeCol
 
   const shapePathData = SHAPE_PATHS[shape] || SHAPE_PATHS.flower;
   const theme = THEMES[themeColor] || THEMES.blue;
+  const gradientId = `progressGradient-${themeColor}-${shape}`; // Make ID unique
 
   useEffect(() => {
     setIsReady(false);
@@ -45,7 +46,7 @@ const ShapeProgress: React.FC<ShapeProgressProps> = ({ progress, shape, themeCol
       role="img"
     >
       <defs>
-        <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor={theme.gradientFromColor} />
           <stop offset="100%" stopColor={theme.gradientToColor} />
         </linearGradient>
@@ -66,7 +67,7 @@ const ShapeProgress: React.FC<ShapeProgressProps> = ({ progress, shape, themeCol
         ref={pathRef}
         d={shapePathData}
         fill="none"
-        stroke="url(#progressGradient)"
+        stroke={`url(#${gradientId})`}
         strokeWidth="5"
         strokeLinecap="round"
         strokeLinejoin="round"

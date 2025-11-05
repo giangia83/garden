@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import ServiceTracker from './components/ServiceTracker';
@@ -20,12 +21,16 @@ import Sidebar from './components/Sidebar';
 import EndOfYearModal from './components/EndOfYearModal';
 import ConfirmationModal from './components/ConfirmationModal';
 import PlanningModal from './components/PlanningModal';
+import PioneerUpgradeModal from './components/PioneerUpgradeModal';
+import AchievementsView from './components/AchievementsView';
+import AchievementToast from './components/AchievementToast';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
-import { ThemeColor, HistoryLog, Shape, ActivityItem, ActivityType, ThemeMode, GroupArrangement, SetupData, TutorialsSeen, TutorialStep, AppState, WeatherCondition, DayStatus, DayEntry, PlanningData, PlanningBlock, UserRole } from './types';
+import { AppView, ThemeColor, HistoryLog, Shape, ActivityItem, ActivityType, ThemeMode, GroupArrangement, SetupData, TutorialsSeen, TutorialStep, AppState, WeatherCondition, DayStatus, DayEntry, PlanningData, PlanningBlock, UserRole, UnlockedAchievements, Achievement } from './types';
 import { isSameDay, daysBetween, isWeekend, getServiceYear, getServiceYearMonths, hoursToHHMM, getCommemorationDate, formatDateKey } from './utils';
 import ShareToast from './components/ShareToast';
 import ShareReportModal from './components/ShareReportModal';
 import { THEMES } from './constants';
+import { ALL_ACHIEVEMENTS } from './achievements';
 
 const SolidStarIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     <svg 
@@ -113,14 +118,14 @@ const TUTORIAL_AGREEMENT_KEY = 'garden-tutorial-agreement';
 const SETTINGS_KEY = 'garden-settings';
 const PRIVACY_MODE_KEY = 'garden-privacy-mode';
 const REMINDER_LAST_SENT_KEY = 'garden-reminder-last-sent';
+const SIMPLE_MODE_KEY = 'garden-simple-mode';
 
-type AppView = 'tracker' | 'activity' | 'history' | 'planning';
 
 const TUTORIALS: Record<AppView, TutorialStep[]> = {
   tracker: [
     { target: '#progress-display-container', title: 'Tu Progreso Mensual', content: 'Este es el corazón de tu informe. Muestra tu avance hacia la meta. ¡Tócalo para editar tu total de horas!', position: 'bottom' },
     { target: '#header-title', title: 'Modo Estadístico', content: 'Toca el título "Garden" para cambiar a una vista de estadísticas detalladas, con proyecciones anuales y más datos sobre tu servicio.', position: 'bottom' },
-    { target: '#ghost-mode-toggle', title: 'Modo Fantasma', content: 'Compite contra ti mismo. El fantasma marca las horas que llevabas en la misma fecha del mes anterior. Ten en cuenta que esta función estará disponible después de que completes tu primer mes de registro en la app.', position: 'bottom' },
+    { target: '#ghost-mode-toggle', title: 'Modo Espejo', content: 'Compite contra ti mismo. El espejo marca las horas que llevabas en la misma fecha del mes anterior. Ten en cuenta que esta función estará disponible después de que completes tu primer mes de registro en la app.', position: 'bottom' },
     { target: '#timer-section', title: 'Temporizador Integrado', content: 'Usa el temporizador para registrar tu servicio en tiempo real. ¡No perderás ni un minuto!', position: 'top' },
     { target: '#streak-indicator', title: 'Tu Racha Diaria', content: '¡Mantén la motivación! Toca aquí para ver los detalles de tu racha y configurar tu día de descanso.', position: 'bottom' },
     { target: '#add-hours-button', title: 'Añadir Horas y Actividad', content: 'Usa este botón para añadir rápidamente las horas de tus sesiones de predicación o para registrar una revisita o estudio.', position: 'top' },
@@ -137,7 +142,8 @@ const TUTORIALS: Record<AppView, TutorialStep[]> = {
   planning: [
     { target: '#planning-week-view', title: 'Planificación Semanal', content: 'Visualiza tu semana de un vistazo. Cada tarjeta representa un día para organizar tu servicio.', position: 'top' },
     { target: '#add-plan-block-button', title: 'Bloques de Servicio', content: 'Toca el botón "+" para añadir un bloque de servicio. Dentro, podrás darle un título, un horario y vincular tus revisitas y estudios para tener un plan claro.', position: 'bottom' },
-  ]
+  ],
+  achievements: [],
 };
 
 const getViewFromHash = (hash: string): AppView => {
@@ -148,6 +154,8 @@ const getViewFromHash = (hash: string): AppView => {
             return 'history';
         case '#/planning':
             return 'planning';
+        case '#/achievements':
+            return 'achievements';
         case '#/':
         case '':
         default:
@@ -215,6 +223,7 @@ const getInitialState = (): AppState | null => {
     if (!parsed.notes) parsed.notes = '';
     if (!parsed.meetingDays) parsed.meetingDays = [];
     if (!parsed.protectedDaySetDate) parsed.protectedDaySetDate = null;
+    if (!parsed.unlockedAchievements) parsed.unlockedAchievements = {};
 
     // Remove legacy streak restore fields
     delete parsed.streakRestores;
@@ -292,6 +301,10 @@ const App: React.FC = () => {
   const [protectedDay, setProtectedDay] = useState<number | null>(initialState?.protectedDay ?? null);
   const [protectedDaySetDate, setProtectedDaySetDate] = useState<string | null>(initialState?.protectedDaySetDate ?? null);
   
+  // Achievement State
+  const [unlockedAchievements, setUnlockedAchievements] = useState<UnlockedAchievements>(initialState?.unlockedAchievements ?? {});
+  const [achievementToastQueue, setAchievementToastQueue] = useState<Achievement[]>([]);
+
   const [activeView, setActiveView] = useState<AppView>(getViewFromHash(window.location.hash));
   const [isAddHoursModalOpen, setAddHoursModalOpen] = useState(false);
   const [isStreakModalOpen, setIsStreakModalOpen] = useState(false);
@@ -303,6 +316,7 @@ const App: React.FC = () => {
   const [isImportConfirmModalOpen, setImportConfirmModalOpen] = useState(false);
   const [importedState, setImportedState] = useState<AppState | null>(null);
   const [isCommemorationModalOpen, setIsCommemorationModalOpen] = useState(false);
+  const [isPioneerUpgradeModalOpen, setIsPioneerUpgradeModalOpen] = useState(false);
   
   const [isPlanningModalOpen, setIsPlanningModalOpen] = useState(false);
   const [dateForPlanning, setDateForPlanning] = useState<Date | null>(null);
@@ -338,8 +352,12 @@ const App: React.FC = () => {
   const [isStreakTutorialModalOpen, setStreakTutorialModalOpen] = useState(false);
   const [showShareToast, setShowShareToast] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isSimpleMode, setIsSimpleMode] = useState(() => localStorage.getItem(SIMPLE_MODE_KEY) === 'true');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const displayThemeColor = isSimpleMode ? 'bw' : themeColor;
+  const displayThemeMode = isSimpleMode && themeMode === 'black' ? 'dark' : themeMode;
 
   // Check for new service year on app load
   useEffect(() => {
@@ -367,6 +385,10 @@ const App: React.FC = () => {
     const settings = { performanceMode, remindersEnabled, reminderTime };
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   }, [performanceMode, remindersEnabled, reminderTime]);
+
+  useEffect(() => {
+    localStorage.setItem(SIMPLE_MODE_KEY, String(isSimpleMode));
+  }, [isSimpleMode]);
   
   useEffect(() => {
     const handleHashChange = () => {
@@ -398,10 +420,10 @@ const App: React.FC = () => {
   }, [currentDate]);
   
   useEffect(() => {
-    if (showWelcome || activeTutorial || tutorialToConfirm) return;
+    if (showWelcome || activeTutorial || tutorialToConfirm || isSimpleMode) return;
     const tutorialAgreement = localStorage.getItem(TUTORIAL_AGREEMENT_KEY);
     if (tutorialAgreement === 'false') return;
-    const shouldShowTutorial = !tutorialsSeen[activeView];
+    const shouldShowTutorial = !tutorialsSeen[activeView] && TUTORIALS[activeView]?.length > 0;
     
     if (shouldShowTutorial) {
       if (hasAgreedToTutorials) {
@@ -411,7 +433,7 @@ const App: React.FC = () => {
         setTutorialToConfirm(activeView);
       }
     }
-  }, [activeView, tutorialsSeen, showWelcome, activeTutorial, tutorialToConfirm, hasAgreedToTutorials]);
+  }, [activeView, tutorialsSeen, showWelcome, activeTutorial, tutorialToConfirm, hasAgreedToTutorials, isSimpleMode]);
 
   // Daily Reminder Logic
   useEffect(() => {
@@ -469,7 +491,7 @@ const App: React.FC = () => {
   };
   
   const handleSkipAllTutorials = () => {
-    const allSeen: TutorialsSeen = { tracker: true, activity: true, history: true, planning: true };
+    const allSeen: TutorialsSeen = { tracker: true, activity: true, history: true, planning: true, achievements: true };
     setTutorialsSeen(allSeen);
     localStorage.setItem(TUTORIALS_SEEN_KEY, JSON.stringify(allSeen));
     localStorage.setItem(TUTORIAL_AGREEMENT_KEY, 'false');
@@ -519,12 +541,11 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.toggle('dark', themeMode !== 'light');
-    root.classList.toggle('theme-black', themeMode === 'black');
-  }, [themeMode]);
-
-  useEffect(() => {
-    const stateToSave: AppState = {
+    root.classList.toggle('dark', displayThemeMode !== 'light');
+    root.classList.toggle('theme-black', displayThemeMode === 'black');
+  }, [displayThemeMode]);
+  
+  const appStateForSaving: AppState = useMemo(() => ({
       currentHours,
       currentLdcHours,
       userName,
@@ -545,10 +566,70 @@ const App: React.FC = () => {
       meetingDays,
       planningData,
       notes,
-    };
-    localStorage.setItem(APP_STORAGE_key, JSON.stringify(stateToSave));
-  }, [currentHours, currentLdcHours, userName, goal, userRole, currentDate, progressShape, themeColor, themeMode, archives, currentServiceYear, activities, groupArrangements, streak, lastLogDate, protectedDay, protectedDaySetDate, meetingDays, planningData, notes]);
-  
+      unlockedAchievements,
+  }), [currentHours, currentLdcHours, userName, goal, userRole, currentDate, progressShape, themeColor, themeMode, archives, currentServiceYear, activities, groupArrangements, streak, lastLogDate, protectedDay, protectedDaySetDate, meetingDays, planningData, notes, unlockedAchievements]);
+
+  useEffect(() => {
+    localStorage.setItem(APP_STORAGE_key, JSON.stringify(appStateForSaving));
+  }, [appStateForSaving]);
+
+  // Achievement Check
+  const checkAchievements = useCallback(() => {
+    const newlyUnlocked: Achievement[] = [];
+
+    ALL_ACHIEVEMENTS.forEach(achievement => {
+      const currentUnlock = unlockedAchievements[achievement.id];
+      const currentTier = currentUnlock ? currentUnlock.unlockedTier : 0;
+      
+      if (currentTier >= achievement.tiers.length) return; // Already maxed out
+
+      const { unlocked, currentProgress } = achievement.check(appStateForSaving);
+      
+      let nextTierIndex = achievement.tiers.findIndex(tierValue => tierValue > (currentUnlock ? achievement.tiers[currentTier - 1] : 0));
+      if (nextTierIndex === -1) { // This can happen if all tiers are met
+          if(currentTier < achievement.tiers.length) {
+              nextTierIndex = currentTier;
+          } else {
+             return; // Already unlocked highest tier
+          }
+      }
+
+      if (unlocked && currentProgress >= achievement.tiers[nextTierIndex]) {
+        let highestNewTier = 0;
+        for(let i = achievement.tiers.length - 1; i >= 0; i--) {
+            if (currentProgress >= achievement.tiers[i] && (i + 1) > currentTier) {
+                highestNewTier = i + 1;
+                break;
+            }
+        }
+
+        if (highestNewTier > currentTier) {
+            newlyUnlocked.push({ ...achievement, unlockedTier: highestNewTier });
+            setUnlockedAchievements(prev => ({
+                ...prev,
+                [achievement.id]: {
+                    unlockedTier: highestNewTier,
+                    unlockedAt: new Date().toISOString()
+                }
+            }));
+        }
+      }
+    });
+
+    if (newlyUnlocked.length > 0) {
+      setAchievementToastQueue(q => [...q, ...newlyUnlocked]);
+    }
+  }, [appStateForSaving, unlockedAchievements]);
+
+  useEffect(() => {
+    // Debounce the achievement check slightly to avoid rapid firing on state changes
+    const handler = setTimeout(() => {
+      checkAchievements();
+    }, 500);
+
+    return () => clearTimeout(handler);
+  }, [checkAchievements]);
+
   useEffect(() => {
     localStorage.setItem(PRIVACY_MODE_KEY, String(isPrivacyMode));
   }, [isPrivacyMode]);
@@ -1015,20 +1096,7 @@ const App: React.FC = () => {
     if (data.name.trim()) setUserName(data.name.trim());
     
     setUserRole(data.role);
-
-    switch (data.role) {
-      case 'publisher':
-      case 'aux_pioneer':
-        setGoal(30);
-        break;
-      case 'spec_pioneer':
-        setGoal(100);
-        break;
-      case 'reg_pioneer':
-      default:
-        setGoal(50);
-        break;
-    }
+    setGoal(data.goal);
     
     const now = new Date();
     const serviceYear = getServiceYear(now);
@@ -1166,6 +1234,7 @@ const App: React.FC = () => {
         setMeetingDays(importedState.meetingDays || []);
         setPlanningData(importedState.planningData || {});
         setNotes(importedState.notes || '');
+        setUnlockedAchievements(importedState.unlockedAchievements || {});
     }
     setImportConfirmModalOpen(false);
     setImportedState(null);
@@ -1199,11 +1268,29 @@ const App: React.FC = () => {
     setProtectedDay(day);
   };
 
+  const handlePioneerUpgrade = (newRole: 'aux_pioneer' | 'reg_pioneer' | 'spec_pioneer') => {
+    setUserRole(newRole);
+    switch (newRole) {
+      case 'aux_pioneer':
+        setGoal(30);
+        break;
+      case 'spec_pioneer':
+        setGoal(100);
+        break;
+      case 'reg_pioneer':
+      default:
+        setGoal(50);
+        break;
+    }
+    setIsPioneerUpgradeModalOpen(false);
+  };
+
   const viewTitleMap: Record<AppView, string> = {
     tracker: 'Garden',
     activity: 'Actividad',
     history: 'Historial',
     planning: 'Planificación',
+    achievements: 'Logros',
   };
   const viewTitle = viewTitleMap[activeView];
 
@@ -1250,7 +1337,7 @@ const App: React.FC = () => {
               onEditLdcClick={openEditLdcModal}
               onAddHours={handleAddHours}
               progressShape={progressShape}
-              themeColor={themeColor}
+              themeColor={displayThemeColor}
               onHelpClick={() => setHelpModalOpen(true)}
               onShareReport={handleOpenShareModal}
               notificationPermission={notificationPermission}
@@ -1265,8 +1352,9 @@ const App: React.FC = () => {
               archives={archives}
               currentServiceYear={currentServiceYear}
               activities={activities}
+              isSimpleMode={isSimpleMode}
             />
-            {!isStatsMode && <GreetingCard userName={userName} themeColor={themeColor} performanceMode={performanceMode} />}
+            {!isStatsMode && <GreetingCard userName={userName} themeColor={displayThemeColor} performanceMode={performanceMode} isSimpleMode={isSimpleMode} />}
           </>
         );
       case 'activity':
@@ -1274,7 +1362,7 @@ const App: React.FC = () => {
                   activities={activities}
                   groupArrangements={groupArrangements}
                   onSaveArrangements={handleSaveArrangements}
-                  themeColor={themeColor} 
+                  themeColor={displayThemeColor} 
                   onEdit={handleStartEditActivity}
                   onDelete={handleDeleteActivity}
                   isOnline={isOnline}
@@ -1288,7 +1376,7 @@ const App: React.FC = () => {
         return <HistoryView 
           archives={archives}
           currentServiceYear={currentServiceYear}
-          themeColor={themeColor}
+          themeColor={displayThemeColor}
           isPrivacyMode={isPrivacyMode}
           onDayClick={handleDayClickForHistory}
           activities={activities}
@@ -1300,8 +1388,15 @@ const App: React.FC = () => {
           planningData={planningData}
           activities={activities}
           onOpenModal={handleOpenPlanningModal}
-          themeColor={themeColor}
+          themeColor={displayThemeColor}
         />;
+      case 'achievements':
+        return <AchievementsView 
+                  allAchievements={ALL_ACHIEVEMENTS}
+                  unlockedAchievements={unlockedAchievements}
+                  themeColor={displayThemeColor}
+                  appState={appStateForSaving}
+               />;
       default:
         return null;
     }
@@ -1324,11 +1419,12 @@ const App: React.FC = () => {
     <div className="min-h-screen text-slate-800 dark:text-slate-200">
       <Header 
         title={viewTitle} 
-        themeColor={themeColor} 
+        themeColor={displayThemeColor} 
         streak={streak}
         onStreakClick={() => setIsStreakModalOpen(true)}
         onMenuClick={() => setSidebarOpen(true)}
-        onTitleClick={() => setIsStatsMode(s => !s)}
+        onTitleClick={() => !isSimpleMode && setIsStatsMode(s => !s)}
+        isSimpleMode={isSimpleMode}
       />
 
       <Sidebar
@@ -1339,7 +1435,7 @@ const App: React.FC = () => {
         onShowWelcome={handleShowWelcome}
         onExport={handleExportData}
         onImport={handleImportClick}
-        themeColor={themeColor}
+        themeColor={displayThemeColor}
         remindersEnabled={remindersEnabled}
         onSetRemindersEnabled={handleSetRemindersEnabled}
         reminderTime={reminderTime}
@@ -1348,6 +1444,17 @@ const App: React.FC = () => {
           setSidebarOpen(false);
           setIsSettingsOpen(true);
         }}
+        userRole={userRole}
+        onPioneerUpgradeClick={() => {
+          setSidebarOpen(false);
+          setIsPioneerUpgradeModalOpen(true);
+        }}
+        onAchievementsClick={() => {
+          window.location.hash = '#/achievements';
+          setSidebarOpen(false);
+        }}
+        isSimpleMode={isSimpleMode}
+        onSetSimpleMode={setIsSimpleMode}
       />
       <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" className="hidden" />
       
@@ -1360,8 +1467,9 @@ const App: React.FC = () => {
       <BottomNav 
         activeView={activeView}
         onAddClick={openAddModal} 
-        themeColor={themeColor}
+        themeColor={displayThemeColor}
         performanceMode={performanceMode}
+        isSimpleMode={isSimpleMode}
       />
 
       <AddHoursModal 
@@ -1378,7 +1486,7 @@ const App: React.FC = () => {
         currentLdcHours={currentLdcHours}
         isEditMode={isEditTotalHoursMode}
         isEditLdcMode={isEditLdcHoursMode}
-        themeColor={themeColor}
+        themeColor={displayThemeColor}
         performanceMode={performanceMode}
         dateForEntry={dateToEdit}
         onSetHoursForDate={handleSetHoursForDate}
@@ -1398,7 +1506,7 @@ const App: React.FC = () => {
           onSave={handleSavePlanningBlock}
           onDelete={handleDeletePlanningBlock}
           activities={activities}
-          themeColor={themeColor}
+          themeColor={displayThemeColor}
           performanceMode={performanceMode}
       />
 
@@ -1419,7 +1527,7 @@ const App: React.FC = () => {
         isOpen={isHelpModalOpen}
         onClose={() => setHelpModalOpen(false)}
         onReplayTutorial={handleReplayTutorial}
-        themeColor={themeColor}
+        themeColor={displayThemeColor}
         performanceMode={performanceMode}
       />
 
@@ -1427,7 +1535,7 @@ const App: React.FC = () => {
         isOpen={isStreakModalOpen}
         onClose={() => setIsStreakModalOpen(false)}
         streak={streak}
-        themeColor={themeColor}
+        themeColor={displayThemeColor}
         protectedDay={protectedDay}
         onSaveProtectedDay={handleSaveProtectedDay}
         protectedDaySetDate={protectedDaySetDate}
@@ -1438,7 +1546,7 @@ const App: React.FC = () => {
         isOpen={isStreakTutorialModalOpen}
         onClose={() => setStreakTutorialModalOpen(false)}
         onAddHoursClick={handleStartFirstLog}
-        themeColor={themeColor}
+        themeColor={displayThemeColor}
         performanceMode={performanceMode}
         currentHours={currentHours}
       />
@@ -1451,7 +1559,7 @@ const App: React.FC = () => {
         currentHours={currentHours}
         currentLdcHours={currentLdcHours}
         activities={activities}
-        themeColor={themeColor}
+        themeColor={displayThemeColor}
         onCopy={() => {
           setIsShareModalOpen(false);
           setShowShareToast(true);
@@ -1463,7 +1571,7 @@ const App: React.FC = () => {
         onClose={() => setGoalReachedModalOpen(false)}
         userName={userName}
         goal={goal}
-        themeColor={themeColor}
+        themeColor={displayThemeColor}
         performanceMode={performanceMode}
       />
 
@@ -1471,7 +1579,7 @@ const App: React.FC = () => {
         isOpen={isEndOfYearModalOpen}
         onArchive={handleArchiveAndStartNewYear}
         onLater={() => setEndOfYearModalOpen(false)}
-        themeColor={themeColor}
+        themeColor={displayThemeColor}
         performanceMode={performanceMode}
         previousYear={currentServiceYear}
       />
@@ -1483,22 +1591,29 @@ const App: React.FC = () => {
         title="Confirmar Importación"
         message="Esto reemplazará todos tus datos actuales con los del archivo. ¿Estás seguro de que quieres continuar?"
         confirmText="Sí, importar datos"
-        themeColor={themeColor}
+        themeColor={displayThemeColor}
       />
 
       <CommemorationModal
         isOpen={isCommemorationModalOpen}
         onConfirm={handleConfirmCommemorationTheme}
         onDecline={handleDeclineCommemorationTheme}
-        themeColor={themeColor}
+        themeColor={displayThemeColor}
         performanceMode={performanceMode}
+      />
+
+      <PioneerUpgradeModal
+        isOpen={isPioneerUpgradeModalOpen}
+        onClose={() => setIsPioneerUpgradeModalOpen(false)}
+        onConfirm={handlePioneerUpgrade}
+        themeColor={displayThemeColor}
       />
 
       <TutorialConfirmationModal
         isOpen={!!tutorialToConfirm}
         onStart={() => handleStartTutorial(tutorialToConfirm!)}
         onSkip={handleSkipAllTutorials}
-        themeColor={themeColor}
+        themeColor={displayThemeColor}
         viewName={tutorialToConfirm ? viewTitleMap[tutorialToConfirm] : ''}
         performanceMode={performanceMode}
       />
@@ -1506,8 +1621,14 @@ const App: React.FC = () => {
       <InteractiveTutorial
         steps={activeTutorial}
         onFinish={() => handleTutorialFinish(activeView)}
-        themeColor={themeColor}
+        themeColor={displayThemeColor}
         performanceMode={performanceMode}
+      />
+      
+      <AchievementToast 
+        queue={achievementToastQueue}
+        onDismiss={() => setAchievementToastQueue(q => q.slice(1))}
+        themeColor={displayThemeColor}
       />
 
       <OfflineToast isVisible={isOfflineReady} onDismiss={() => setIsOfflineReady(false)} />

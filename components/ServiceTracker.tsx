@@ -40,6 +40,7 @@ interface ServiceTrackerProps {
   archives: Record<string, HistoryLog>;
   currentServiceYear: string;
   activities: ActivityItem[];
+  isSimpleMode: boolean;
 }
 
 const ServiceTracker: React.FC<ServiceTrackerProps> = ({ 
@@ -67,6 +68,7 @@ const ServiceTracker: React.FC<ServiceTrackerProps> = ({
   archives,
   currentServiceYear,
   activities,
+  isSimpleMode,
 }) => {
   const theme = THEMES[themeColor] || THEMES.blue;
   
@@ -84,30 +86,34 @@ const ServiceTracker: React.FC<ServiceTrackerProps> = ({
   return (
     <div className={`bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-200/50 dark:border-slate-700/50 w-full max-w-2xl mx-auto transition-[padding-bottom] duration-300 ${isStatsMode ? 'pb-6' : ''}`}>
       <div className="grid grid-cols-3 items-center mb-2">
-        <div className="flex justify-start items-center space-x-1">
-          <button 
-            onClick={onTogglePrivacyMode}
-            className="p-2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
-            aria-label={isPrivacyMode ? "Mostrar horas" : "Ocultar horas"}
-          >
-            {isPrivacyMode ? <EyeSlashIcon className="w-6 h-6" /> : <EyeIcon className="w-6 h-6" />}
-          </button>
-          {isPioneer && (
+        {!isSimpleMode ? (
+          <div className="flex justify-start items-center space-x-1">
             <button 
-              id="ghost-mode-toggle"
-              onClick={onToggleGhostMode}
-              className={`p-2 rounded-full transition-colors ${isGhostMode ? theme.text + ' ' + theme.bg + ' bg-opacity-10' : 'text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700/50'}`}
-              aria-label={isGhostMode ? "Ocultar ritmo del mes pasado" : "Mostrar ritmo del mes pasado"}
+              onClick={onTogglePrivacyMode}
+              className="p-2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
+              aria-label={isPrivacyMode ? "Mostrar horas" : "Ocultar horas"}
             >
-              <GhostIcon className="w-6 h-6" />
+              {isPrivacyMode ? <EyeSlashIcon className="w-6 h-6" /> : <EyeIcon className="w-6 h-6" />}
             </button>
-          )}
-        </div>
+            {isPioneer && (
+              <button 
+                id="ghost-mode-toggle"
+                onClick={onToggleGhostMode}
+                className={`p-2 rounded-full transition-colors ${isGhostMode ? theme.text + ' ' + theme.bg + ' bg-opacity-10' : 'text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700/50'}`}
+                aria-label={isGhostMode ? "Ocultar ritmo del mes pasado" : "Mostrar ritmo del mes pasado"}
+              >
+                <GhostIcon className="w-6 h-6" />
+              </button>
+            )}
+          </div>
+        ) : <div />}
         <p className="text-center text-sm font-semibold text-slate-500 dark:text-slate-400">Meta: {isPrivacyMode ? '**' : goal} hrs</p>
         <div className="flex justify-end items-center space-x-1">
-          <button onClick={onHelpClick} className="p-2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300" aria-label="Ayuda">
-            <HelpIcon className="w-6 h-6" />
-          </button>
+          {!isSimpleMode && (
+            <button onClick={onHelpClick} className="p-2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300" aria-label="Ayuda">
+              <HelpIcon className="w-6 h-6" />
+            </button>
+          )}
           <button onClick={onShareReport} className="p-2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300" aria-label="Compartir informe">
             <ShareIcon className="w-6 h-6" />
           </button>
@@ -131,7 +137,7 @@ const ServiceTracker: React.FC<ServiceTrackerProps> = ({
                 </div>
               </button>
             </div>
-            {!isPrivacyMode && isPioneer && (isStatsMode || currentLdcHours > 0) && (
+            {!isPrivacyMode && isPioneer && (currentLdcHours > 0 || (!isSimpleMode && isStatsMode)) && (
                 <button onClick={onEditLdcClick} className={`flex flex-col items-center justify-center animate-fadeIn group`} aria-label="Editar horas LDC">
                     <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-700/50 flex flex-col items-center justify-center text-center border border-slate-200 dark:border-slate-600 transition-transform group-hover:scale-105">
                         <p className={`text-3xl font-bold text-slate-800 dark:text-slate-100 tracking-tight transition-all ${privacyBlur}`}>
@@ -143,7 +149,7 @@ const ServiceTracker: React.FC<ServiceTrackerProps> = ({
             )}
         </div>
 
-        {isStatsMode && (
+        {isStatsMode && !isSimpleMode && (
           <div className="flex items-center justify-around w-full max-w-sm mx-auto mb-4 -mt-2">
             <ServiceYearProgressIndicator currentDate={currentDate} isPrivacyMode={isPrivacyMode}/>
             <WeekdayCircle themeColor={themeColor} />
@@ -151,32 +157,52 @@ const ServiceTracker: React.FC<ServiceTrackerProps> = ({
           </div>
         )}
 
-        <div className={`w-full grid grid-cols-2 gap-4 text-center mb-4 transition-all ${privacyBlur}`}>
-            <div>
-                <p className="text-4xl font-bold text-slate-700 dark:text-slate-200">{isPrivacyMode ? '**:**' : hoursToHHMM(remainingHours)}</p>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Restantes</p>
+        {!isSimpleMode && (
+          <div className={`w-full grid grid-cols-2 gap-4 text-center mb-4 transition-all ${privacyBlur}`}>
+              <div>
+                  <p className="text-4xl font-bold text-slate-700 dark:text-slate-200">{isPrivacyMode ? '**:**' : hoursToHHMM(remainingHours)}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Restantes</p>
+              </div>
+               <div>
+                  <p className={`text-4xl font-bold ${theme.text}`}>{isPrivacyMode ? '**%' : `${percentage.toFixed(0)}%`}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Completado</p>
+              </div>
+          </div>
+        )}
+        
+        {isSimpleMode && (
+            <div className={`w-full max-w-xs mx-auto my-4 transition-all ${privacyBlur}`}>
+                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5">
+                    <div 
+                        className={`h-2.5 rounded-full bg-gradient-to-r ${theme.gradientFrom} ${theme.gradientTo} transition-[width] duration-500`}
+                        style={{ width: isPrivacyMode ? '0%' : `${percentage}%` }}
+                    ></div>
+                </div>
+                <div className="flex justify-between text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1 px-1">
+                    <span>0</span>
+                    <span>{isPrivacyMode ? '**%' : `${percentage.toFixed(0)}%`}</span>
+                    <span>{isPrivacyMode ? '**' : goal}</span>
+                </div>
             </div>
-             <div>
-                <p className={`text-4xl font-bold ${theme.text}`}>{isPrivacyMode ? '**%' : `${percentage.toFixed(0)}%`}</p>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Completado</p>
-            </div>
-        </div>
+        )}
 
-        <div className="w-full px-4 mb-4">
-          <PaceTracker 
-            currentHours={currentHours}
-            goal={goal}
-            currentDate={currentDate}
-            themeColor={themeColor}
-            isPrivacyMode={isPrivacyMode}
-            isGhostMode={isGhostMode}
-            previousMonthHistory={previousMonthHistory}
-            isPioneer={isPioneer}
-          />
-        </div>
+        {!isSimpleMode && (
+          <div className="w-full px-4 mb-4">
+            <PaceTracker 
+              currentHours={currentHours}
+              goal={goal}
+              currentDate={currentDate}
+              themeColor={themeColor}
+              isPrivacyMode={isPrivacyMode}
+              isGhostMode={isGhostMode}
+              previousMonthHistory={previousMonthHistory}
+              isPioneer={isPioneer}
+            />
+          </div>
+        )}
         
         <div id="timer-section" className="w-full border-t border-slate-200/80 dark:border-slate-700/80 pt-4">
-           {isStatsMode ? (
+           {isStatsMode && !isSimpleMode ? (
              <StatsView 
                 archives={archives}
                 currentServiceYear={currentServiceYear}
